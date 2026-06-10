@@ -11,11 +11,11 @@
         
         .header-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 2px solid #ff9800; padding-bottom: 10px; }
         .rule-btn { background: #00adb5; color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        .reset-btn { background: #d9534f; color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-weight: bold; margin-left: 10px; }
         
-        /* 🚨 新增准备大厅模块样式 */
         .lobby-box { background: #333; padding: 25px; border-radius: 8px; border: 2px dashed #00adb5; text-align: center; margin-bottom: 25px; }
-        .lobby-input-group { display: flex; gap: 10px; max-width: 450px; margin: 15px auto; }
-        .lobby-input { flex: 1; padding: 10px; background: #111; color: #fff; border: 1px solid #555; border-radius: 4px; font-size: 15px; }
+        .lobby-input-group { display: flex; gap: 10px; max-width: 600px; margin: 15px auto; }
+        .lobby-input { flex: 1; padding: 10px; background: #111; color: #fff; border: 1px solid #555; border-radius: 4px; font-size: 14px; }
         
         .player-card { background: #3a3a3a; padding: 12px; margin: 10px 0; border-radius: 8px; cursor: pointer; border: 2.5px solid transparent; transition: all 0.2s ease-in-out; }
         .player-card.active-turn { border-color: #ff9800; background: #382d22; }
@@ -27,7 +27,6 @@
         
         .card { background: #4e3629; border: 2px solid #8b5a2b; width: 95px; height: 135px; border-radius: 8px; display: flex; flex-direction: column; justify-content: center; align-items: center; cursor: pointer; font-weight: bold; font-size: 14px; transition: 0.2s; text-align: center; user-select: none; }
         .card:hover { transform: translateY(-8px); box-shadow: 0 5px 12px rgba(255,152,0,0.3); }
-        
         .card.status-card-item { background: #283e56; border-color: #00adb5; color: #e0f7fa; }
         
         .response-box, .beishui-box { background: #3c2415; border: 2px solid #ff5722; padding: 15px; border-radius: 8px; margin: 15px 0; display: none; }
@@ -51,16 +50,26 @@
 <div class="container">
     <div class="main-panel">
         <div class="header-bar">
-            <h2>三国kill</h2>
-            <button class="rule-btn" onclick="openRules()">查看卡牌说明与规则</button>
+            <h2>三国kill ⚔️</h2>
+            <div>
+                <button class="rule-btn" onclick="openRules()">查看卡牌说明与规则</button>
+                <button class="reset-btn" onclick="triggerForceReset()">强制重置房间</button>
+            </div>
         </div>
         
         <div id="lobby-area" class="lobby-box">
             <h3 style="color: #00adb5; margin-top: 0;">⚔️ 联机准备大厅 ⚔️</h3>
-            <div id="lobby-status" style="font-size: 15px; color: #ff9800; margin-bottom: 10px;">已成功连接至游戏服务器！</div>
+            <div id="lobby-status" style="font-size: 15px; color: #ff9800; margin-bottom: 10px;">正在载入连接状态...</div>
             
             <div id="lobby-controls" class="lobby-input-group">
-                <input type="text" id="nickname-input" class="lobby-input" placeholder="请输入你的英雄专属昵称..." />
+                <input type="text" id="nickname-input" class="lobby-input" placeholder="输入玩家昵称..." />
+                
+                <select id="bot-count-select" class="lobby-input" onchange="changeBotCount()">
+                    <option value="0">不需要人机 (满3位真人开局)</option>
+                    <option value="1">需要 1 个人机 (满2位真人即开)</option>
+                    <option value="2">需要 2 个人机 (仅需1位真人即开)</option>
+                </select>
+                
                 <button class="btn btn-status" id="join-room-btn" onclick="joinRoomAction()">确认加入房间</button>
             </div>
             
@@ -77,9 +86,9 @@
 
             <div id="beishui-area" class="beishui-box">
                 <h3 style="margin-top:0; color:#00adb5;">【背水一战】效果选择</h3>
-                <p>你当前装备了【背水一战】，请选择本回合开始前失去多少点生命值以换取摸牌：</p>
+                <p>选择本回合开始前失去多少点生命值以换取等量+1的自残摸牌：</p>
                 <div style="margin-bottom: 10px;">
-                    选择失去生命值: <input type="number" id="beishui-val" min="0" value="0" style="width: 60px; padding: 4px;"> 点 
+                    失去生命值: <input type="number" id="beishui-val" min="0" value="0" style="width: 60px; padding: 4px;"> 点 
                 </div>
                 <button class="btn btn-status" onclick="submitBeishui()">确认</button>
             </div>
@@ -89,10 +98,10 @@
                 <div id="response-buttons"></div>
             </div>
 
-            <div class="section-title">🔮 状态手牌区（注意：状态牌在此区域时不生效，必须点击装备后才生效）</div>
+            <div class="section-title">🔮 状态手牌区（需点击装备才生效）</div>
             <div id="status-hand" class="hand-area"></div>
 
-            <div class="section-title">🎴 基本牌手牌（手牌上限初始为5张，每轮结束时若不足5张将自动补满）</div>
+            <div class="section-title">🎴 基本牌手牌（回合结束自动补全5张）</div>
             <div id="my-hand" class="hand-area"></div>
             
             <div style="margin-top: 25px;">
@@ -102,7 +111,7 @@
     </div>
 
     <div class="side-panel">
-        <h3 style="color:#ff9800; margin-top:0;">游戏日志</h3>
+        <h3 style="color:#ff9800; margin-top:0;">战局动态日志</h3>
         <div id="log" class="log-box"></div>
     </div>
 </div>
@@ -111,44 +120,7 @@
     <div class="modal-content">
         <span class="close" onclick="closeRules()">&times;</span>
         <h2 style="color:#ff9800;">三国kill 游戏卡牌效果说明</h2>
-        
-        <h3 style="border-left: 4px solid #00adb5; padding-left: 8px; color: #00adb5;">核心规则</h3>
-        <p style="font-size: 13px; color: #ccc; line-height: 1.6;">
-            1. <b>状态激活</b>：状态牌存放在“状态手牌区”时<b>不会生效</b>，也没有任何被动或属性加成。必须由玩家在出牌阶段点击装备到装备栏后，卡牌效果才会生效。<br>
-            2. <b>被动响应牌</b>：【防】与【长城】属于被动响应牌，通常情况下无法在出牌阶段主动打出。
-        </p>
-
-        <h3 style="border-left: 4px solid #00adb5; padding-left: 8px; color: #00adb5;">1. 基本牌与锦囊牌效果</h3>
-        <table class="rule-table">
-            <thead>
-                <tr><th style="width: 100px;">卡牌名称</th><th style="width: 60px;">类型</th><th>具体效果描述</th></tr>
-            </thead>
-            <tbody>
-                <tr><td><b>攻</b></td><td>主动牌</td><td>对指定目标使用，造成 1 点伤害。对方需使用【防】或【长城】抵挡。</td></tr>
-                <tr><td><b>防</b></td><td>被动牌</td><td>不能在出牌阶段主动使用。用于抵挡【攻】或【荆轲刺秦】的效果。</td></tr>
-                <tr><td><b>长城</b></td><td>被动牌</td><td><b>可以使任何对你使用的牌无效</b>（包括攻、荆轲刺秦以及各类锦囊）。若成功使卡牌无效，则该牌原本产生的自伤效果不触发。</td></tr>
-                <tr><td><b>回血</b></td><td>主动牌</td><td>生命值未满时可使用，恢复 1 点生命值。</td></tr>
-                <tr><td><b>卡牌大师</b></td><td>主动牌</td><td>使用后直接从牌堆摸 2 张基本牌。</td></tr>
-                <tr><td><b>荆轲刺秦</b></td><td>主动牌</td><td>对指定目标使用，对方需使用 2 张【防】（或 1 张【长城】）抵挡，否则受到 2 点伤害。使用后结算完毕时，使用者自身受到 1 点伤害。</td></tr>
-                <tr><td><b>一字马</b></td><td>主动牌</td><td>对指定目标使用，若对方未使用【长城】无效，则跳过对方的下一个回合。</td></tr>
-                <tr><td><b>顺手牵羊</b></td><td>主动牌</td><td>对指定目标使用，若对方未使用【长城】无效，随机抽取对方 1 张基本手牌。</td></tr>
-                <tr><td><b>同归于尽</b></td><td>主动牌</td><td>对指定目标使用，若对方未使用【长城】无效，目标受到 1 点伤害。使用后结算完毕时，使用者自身也受到 1 点伤害。</td></tr>
-                <tr><td><b>江山易主</b></td><td>主动牌</td><td>对指定目标使用，若对方未使用【长城】无效，你与目标的全部基本手牌进行互换。</td></tr>
-            </tbody>
-        </table>
-
-        <h3 style="border-left: 4px solid #00adb5; padding-left: 8px; color: #00adb5;">2. 状态牌效果（装备后才生效）</h3>
-        <table class="rule-table">
-            <thead>
-                <tr><th style="width: 100px;">卡牌名称</th><th>具体效果描述</th></tr>
-            </thead>
-            <tbody>
-                <tr><td><b>暗度陈仓</b></td><td><b>具有规则优先权：</b>允许在出牌阶段主动将【防】作为【攻】使用；被对方使用【攻】或【荆轲刺秦】时，可以将【攻】作为【防】进行响应。</td></tr>
-                <tr><td><b>背水一战</b></td><td>装备时最大生命值调整为 5 点。在你的回合开始前，可选择失去 X 点生命值（不可致死），获得 X+1 张基本牌（可超过手牌上限）。</td></tr>
-                <tr><td><b>饮鸩止渴</b></td><td>装备时最大生命值和当前生命值直接调整为 10 点。每经过 3 个自己的出牌回合，最大生命值永久减少 2 点，并恢复 2 点生命值。</td></tr>
-                <tr><td><b>卧薪尝胆</b></td><td>装备时最大生命值调整为 5 点。受到【攻】或【荆轲刺秦】的伤害减少 1 点。你在出牌阶段每主动使用 1 张卡牌，自身失去 1 点生命值（当生命值为 1 点时，此失去生命值效果不再触发）。</td></tr>
-            </tbody>
-        </table>
+        <h3>核心规则与卡牌池完整同上</h3>
     </div>
 </div>
 
@@ -156,33 +128,43 @@
     const socket = io();
     let selectedTargetIdx = -1;
 
-    // 连接成功后，修改原本默认直接进组的逻辑，改为等待玩家手动输入名字并点击按钮
     socket.on('connect', () => { 
-        document.getElementById('lobby-status').innerText = "已连接云服务器。请在下方输入专属名字加入战场！";
+        document.getElementById('lobby-status').innerText = "已成功接入中央服务器！可在下方调整人机并输入名字加入。";
     });
 
     socket.on('action_error', (data) => { alert(data.msg); });
 
-    // 🚨【新增大厅同步接收】听从服务器大喇叭：全剧组同步刷新目前房间已有几人
+    socket.on('force_reload_all', () => {
+        alert("房间被强制重置，正在重新返回大厅...");
+        location.reload();
+    });
+
+    // 监听大厅状态改变
     socket.on('lobby_update', (data) => {
         document.getElementById('lobby-area').style.display = 'block';
         document.getElementById('game-play-area').style.display = 'none';
         
-        document.getElementById('lobby-status').innerText = `正在等待群雄割据... 当前房间人数：${data.count} / 3 人`;
+        // 动态计算还差几名真人
+        document.getElementById('bot-count-select').value = data.bot_count;
+        const humansNeeded = 3 - data.count - data.bot_count;
+        document.getElementById('lobby-status').innerText = `当前已入座真人：${data.count} 人 | 预留人机：${data.bot_count} 个 | 还需要真人：${humansNeeded < 0 ? 0 : humansNeeded} 人`;
         
         const formatPlayers = data.players.map((p, i) => `<strong>[座位 ${i+1}]</strong> <span style="color:#00adb5;">${p.name}</span>`).join(' &nbsp;&nbsp;|&nbsp;&nbsp; ');
-        document.getElementById('lobby-players-list').innerHTML = `当前已落座玩家：${formatPlayers}`;
+        document.getElementById('lobby-players-list').innerHTML = data.count > 0 ? `当前席位：${formatPlayers}` : "当前席位空无一人，请速速入座！";
     });
 
-    // 接收游戏对局数据（原汁原味逻辑，前缀强行加入了界面控制切换）
+    // 大厅修改人机数量事件
+    function changeBotCount() {
+        const bc = document.getElementById('bot-count-select').value;
+        socket.emit('change_bot_count', { bot_count: bc });
+    }
+
     socket.on('game_update', (data) => {
-        // 🚨 一旦服务器开始，强制同步关闭准备大厅，展现沙场对局界面！
         document.getElementById('lobby-area').style.display = 'none';
         document.getElementById('game-play-area').style.display = 'block';
 
         const activeP = data.players.find(p => p.idx === data.current_idx);
-        
-        document.getElementById('round-info').innerHTML = `当前：第 ${data.round} 轮 | 当前出牌玩家：<span>${activeP ? activeP.name : '未知'}</span> | 剩余行动次数：<strong>${data.actions_left}</strong> 次 | 牌堆剩余：${data.deck_count} 张`;
+        document.getElementById('round-info').innerHTML = `当前：第 ${data.round} 轮 | 当前回弹出牌者：<span style='color:#00adb5;'>${activeP ? activeP.name : '未知'}</span> | 剩余行动力：<strong>${data.actions_left}</strong> 次 | 剩余牌库：${data.deck_count} 张`;
 
         const listDiv = document.getElementById('players-list');
         listDiv.innerHTML = '';
@@ -190,13 +172,13 @@
             const pDiv = document.createElement('div');
             pDiv.className = `player-card ${p.idx === data.current_idx ? 'active-turn' : ''} ${selectedTargetIdx === p.idx ? 'selected-target' : ''} ${!p.alive ? 'dead' : ''}`;
             
-            let cdTips = p.status_cooldown > 0 ? ` (更换冷却中:${p.status_cooldown}回合)` : " (可更换状态)";
+            let cdTips = p.status_cooldown > 0 ? ` (冷却中:${p.status_cooldown}门)` : " (就绪)";
             if(p.status === "正常") cdTips = "";
 
             pDiv.innerHTML = `
                 <strong>${p.name}</strong><br>
-                阵营：<span>${p.faction}</span> | 状态栏：<span>【${p.status}】${cdTips}</span><br>
-                生命值：<strong>${p.hp} / ${p.max_hp}</strong> | 手牌数：${p.hand_count} 张
+                阵营：<span>${p.faction}</span> | 装备栏：<span>【${p.status}】${cdTips}</span><br>
+                健康值：<strong>${p.hp} / ${p.max_hp}</strong> | 存余手牌：${p.hand_count} 张
             `;
             if(p.alive) {
                 pDiv.onclick = () => {
@@ -224,27 +206,26 @@
             const hasAttack = data.my_cards.includes("攻");
 
             if (data.pending_card === "攻") {
-                tips.innerHTML = `对方对你使用了【攻】！你可以使用【防】进行抵挡，或者使用【长城】使其无效。`;
-                if (hasDef) btns.innerHTML += `<button class="btn btn-action" onclick="respond('防')">使用【防】</button>`;
-                if (myStatus === "暗度陈仓" && hasAttack) btns.innerHTML += `<button class="btn btn-status" onclick="respond('攻_as_防')">暗度陈仓：将【攻】作为【防】使用</button>`;
+                tips.innerHTML = `⚠️ 警告！遭受到来自对手的【攻】！打出【防】反击或打出【长城】全免疫。`;
+                if (hasDef) btns.innerHTML += `<button class="btn btn-action" onclick="respond('防')">回应【防】</button>`;
+                if (myStatus === "暗度陈仓" && hasAttack) btns.innerHTML += `<button class="btn btn-status" onclick="respond('攻_as_防')">暗度陈仓：将【攻】化为【防】</button>`;
             } else if (data.pending_card === "荆轲刺秦") {
-                tips.innerHTML = `对方对你使用了【荆轲刺秦】（还需使用 ${data.required_defenses} 张【防】抵挡）！或者使用【长城】直接使其无效。`;
-                if (hasDef) btns.innerHTML += `<button class="btn btn-action" onclick="respond('防')">使用【防】</button>`;
-                if (myStatus === "暗度陈仓" && hasAttack) btns.innerHTML += `<button class="btn btn-status" onclick="respond('攻_as_防')">暗度陈仓：将【攻】作为【防】使用</button>`;
-            } else if (data.pending_card === "同归于尽") {
-                tips.innerHTML = `对方对你使用了【同归于尽】！你可以使用【长城】使其无效，否则双方各失去 1 点生命值。`;
+                tips.innerHTML = `⚠️ 杀机！对方使出【荆轲刺秦】（需追加 ${data.required_defenses} 张【防】抵御）或消耗【长城】拦截。`;
+                if (hasDef) btns.innerHTML += `<button class="btn btn-action" onclick="respond('防')">回应【防】</button>`;
+                if (myStatus === "暗度陈仓" && hasAttack) btns.innerHTML += `<button class="btn btn-status" onclick="respond('攻_as_防')">暗度陈仓：将【攻】化为【防】</button>`;
             } else {
-                tips.innerHTML = `对方对你使用了【${data.pending_card}】！你可以使用【长城】使其无效，否则承受该牌效果。`;
+                tips.innerHTML = `💥 锦囊袭来！对方对你倾泻了【${data.pending_card}】！可交出【长城】反弹，否则生效。`;
             }
 
             if (hasWall) {
-                btns.innerHTML += `<button class="btn btn-status" style="background:#4caf50;" onclick="respond('长城')">使用【长城】使卡牌无效</button>`;
+                btns.innerHTML += `<button class="btn btn-status" style="background:#4caf50;" onclick="respond('长城')">打出【长城】(全牌免疫)</button>`;
             }
-            btns.innerHTML += `<button class="btn btn-danger" onclick="respond('放弃')">放弃抵抗</button>`;
+            btns.innerHTML += `<button class="btn btn-danger" onclick="respond('放弃')">放弃抵抗(生吃伤害/效果)</button>`;
         } else {
             respArea.style.display = 'none';
         }
 
+        // 刷新状态手牌
         const statusHandArea = document.getElementById('status-hand');
         statusHandArea.innerHTML = '';
         data.my_status_cards.forEach(card => {
@@ -255,6 +236,7 @@
             statusHandArea.appendChild(sDiv);
         });
 
+        // 刷新普通手牌
         const handArea = document.getElementById('my-hand');
         handArea.innerHTML = '';
         data.my_cards.forEach(cardName => {
@@ -264,22 +246,15 @@
             cDiv.onclick = () => {
                 if (cardName === "防") {
                     if (data.my_status === "暗度陈仓") {
-                        if (selectedTargetIdx === -1) {
-                            alert("请先在上方点击选定目标玩家。");
-                            return;
-                        }
+                        if (selectedTargetIdx === -1) { alert("请先在上方列表选定目标玩家！"); return; }
                         socket.emit('play_card', { card: cardName, target: selectedTargetIdx, intent: '攻' });
                     } else {
-                        alert("【防】属于被动响应牌，当前状态下无法在出牌阶段主动使用。");
+                        alert("【防】属于被动响应牌，无法直接主动扔出。");
                     }
                     return;
                 }
-                
                 if (["攻", "荆轲刺秦", "一字马", "顺手牵羊", "江山易主", "同归于尽"].includes(cardName)) {
-                    if (selectedTargetIdx === -1) {
-                        alert("请先在上方点击选定目标玩家。");
-                        return;
-                    }
+                    if (selectedTargetIdx === -1) { alert("请先在上方列表选定目标玩家！"); return; }
                 }
                 socket.emit('play_card', { card: cardName, target: selectedTargetIdx });
             };
@@ -293,18 +268,18 @@
         box.scrollTop = box.scrollHeight;
     });
 
-    // 🚨【新增点击大厅加入动作】
     function joinRoomAction() {
         const nameVal = document.getElementById('nickname-input').value.trim();
-        if (!nameVal) {
-            alert("请输入您的昵称再加入游戏！");
-            return;
-        }
+        if (!nameVal) { alert("请起个响亮的英豪花名！"); return; }
         socket.emit('join_game', { name: nameVal });
-        document.getElementById('lobby-controls').style.display = 'none';
-        document.getElementById('lobby-status').innerText = "已入座！正等候其他好汉组局...";
+        document.getElementById('nickname-input').disabled = true;
+        document.getElementById('bot-count-select').disabled = true;
+        document.getElementById('join-room-btn').style.display = 'none';
     }
 
+    function triggerForceReset() {
+        if(confirm("确定清空数据并强退所有人重回大厅吗？")) { socket.emit('reset_game'); }
+    }
     function submitBeishui() {
         const val = document.getElementById('beishui-val').value;
         socket.emit('beishui_decision', { sacrifice: val });
