@@ -1,589 +1,652 @@
 import random
-import time
 from flask import Flask, render_template, request
 from flask_socketio import SocketIO, emit
 
-print("[系统重构] 三国kill·底层状态流深层修复版正在全速注入...")
-
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'three_kingdoms_kill_v7_final'
+app.config['SECRET_KEY'] = 'sg_kill_ultimate_2026'
+# 允许任何跨域连接，确保本地开发测试顺畅
 socketio = SocketIO(app, cors_allowed_origins="*")
 
-game_state = {
-    "players": [],       
-    "deck": [],          
-    "discard_pile": [],  
-    "round": 1,          
-    "current_idx": 0,    
-    "actions_left": 2,   
-    "game_started": False,
-    "pending_response": None,
-    "pending_beishui": None,
-    "bot_count": 0,        
-    "bot_running": False   
-}
-
-BASIC_POOL = (
-    ["攻"] * 60 + ["防"] * 50 + ["长城"] * 20 + ["回血"] * 20 +
-    ["荆轲刺秦"] * 10 + ["一字马"] * 10 + ["顺手牵羊"] * 10 + ["江山易主"] * 5 +
-    ["卡牌大师"] * 10 + ["同归于尽"] * 5
+# ==========================================
+# 🃏 核心游戏规则与全量卡牌数据中心
+# ==========================================
+BASIC_CARDS = (
+    ["攻"] * 15 + ["防"] * 10 + ["长城"] * 4 + ["回血"] * 6 + 
+    ["卡牌大师"] * 4 + ["荆轲刺秦"] * 3 + ["一字马"] * 3 + 
+    ["顺手牵羊"] * 4 + ["江山易主"] * 2 + ["同归于尽"] * 3
 )
-STATUS_POOL = ["背水一战", "饮鸩止渴", "卧薪尝胆", "暗度陈仓"]
+STATUS_CARDS = ["背水一战", "饮鸩止渴", "卧薪尝胆", "暗度陈仓"]
 
-def init_game():
-    game_state["deck"] = BASIC_POOL.copy()
-    random.shuffle(game_state["deck"])
-    game_state["discard_pile"] = []
-    game_state["round"] = 1
-    game_state["current_idx"] = 0
-    game_state["actions_left"] = 2  
-    game_state["pending_response"] = None
-    game_state["pending_beishui"] = None
-    game_state["game_started"] = True
+class GameEngine:
+    def __init__(self):
+        self.reset()
 
-    factions = ["司", "丁", "冀"]
-    random.shuffle(factions)
+    def reset(self):
+        self.active = False
+        self.players = []       # 动态玩家存储空间
+        self.bot_count = 2      # 默认匹配人机配额
+        self.current_idx = 0    # 当前出手权归属指针
+        self.round = 1          # 局势大轮次计数
+        self.actions_left = 0   # 当前行动方拥有的剩余可支配行动力
+        self.deck = []          # 主基础摸牌堆
+        self.status_deck = []   # 状态装备牌堆
+        self.pending_action = None  # 核心攻防挂起结算句柄（用于锁死等待响应）
+        self.logs = []          # 历史战局事件存盘
 
-    for i, p in enumerate(game_state["players"]):
-        p["alive"] = True
-        p["hp"] = 5
-        p["max_hp"] = 5  
-        p["faction"] = factions[i]
-        p["revealed"] = False  
-        p["death_count"] = 0   
-        p["status"] = "正常"       
-        p["status_cooldown"] = 0  
-        p["yinzhen_turns"] = 0     
-        p["status_hand"] = []     
-        p["hand"] = []            
-        p["skip_next_turn"] = False
-        deal_card_to_player(p, 5) 
-        
-    refresh_status_hands() 
-    broadcast_state()
-
-def refresh_status_hands():
-    for p in game_state["players"]:
-        if p["alive"]:
-            p["status_hand"] = random.sample(STATUS_POOL, 2)
-    socketio.emit('log', {"msg": "系统：本轮全场状态卡牌备选池已洗牌重置。"})
-
-def broadcast_state():
-    if not game_state["game_started"]:
-        lobby_summary = [{"name": p["name"], "idx": p["idx"]} for p in game_state["players"]]
-        socketio.emit('lobby_update', {
-            "players": lobby_summary,
-            "count": len(game_state["players"]),
-            "bot_count": game_state["bot_count"]
-        })
-        return
-
-    for observer in game_state["players"]:
-        if observer.get("is_bot"): continue
-
-        players_summary = []
-        for p in game_state["players"]:
-            visible_faction = p["faction"] if (p["idx"] == observer["idx"] or p["revealed"]) else "隐藏"
-            players_summary.append({
-                "name": p["name"], "idx": p["idx"], "alive": p["alive"],
-                "faction": visible_faction, "hp": p["hp"], "max_hp": p["max_hp"],
-                "hand_count": len(p["hand"]), "status": p["status"],
-                "status_cooldown": p.get("status_cooldown", 0)
-            })
-            
-        is_my_response = False
-        pending_card = ""
-        req_defenses = 0
-        if game_state["pending_response"] and game_state["pending_response"]["target_idx"] == observer["idx"]:
-            is_my_response = True
-            pending_card = game_state["pending_response"]["card"]
-            req_defenses = game_state["pending_response"].get("required_defenses", 1)
-
-        is_beishui_prompt = (game_state["pending_beishui"] == observer["idx"])
-
-        emit('game_update', {
-            "game_started": True,
-            "my_idx": observer["idx"], 
-            "round": game_state["round"],
-            "current_idx": game_state["current_idx"],
-            "actions_left": game_state["actions_left"], 
-            "deck_count": len(game_state["deck"]),
-            "players": players_summary,
-            "my_cards": observer["hand"],
-            "my_status": observer["status"], 
-            "my_status_cards": observer.get("status_hand", []),
-            "is_my_response": is_my_response,
-            "pending_card": pending_card,
-            "required_defenses": req_defenses,
-            "is_beishui_prompt": is_beishui_prompt
-        }, to=observer["sid"])
-
-    check_and_trigger_bot()
-
-def deal_card_to_player(player, count=1):
-    batch_drawn = {}
-    cards_drawn = 0
-    temporary_put_aside = [] 
-    while cards_drawn < count:
-        if not game_state["deck"]:
-            if game_state["discard_pile"]:
-                game_state["deck"] = game_state["discard_pile"].copy()
-                random.shuffle(game_state["deck"])
-                game_state["discard_pile"] = []
-                socketio.emit('log', {"msg": "系统：牌堆枯竭！已自动回收弃牌堆洗牌重组。"})
-            else:
-                break
-        card = game_state["deck"].pop()
-        current_type_count = batch_drawn.get(card, 0)
-        if current_type_count >= 3:
-            temporary_put_aside.append(card)
-            continue
-        else:
-            batch_drawn[card] = current_type_count + 1
-            player["hand"].append(card)
-            cards_drawn += 1
-    if temporary_put_aside:
-        game_state["deck"].extend(temporary_put_aside)
-        random.shuffle(game_state["deck"])
-
-def check_health_and_victory():
-    for p in game_state["players"]:
-        if p["alive"]:
-            if p["hp"] > p["max_hp"]: p["hp"] = p["max_hp"]
-            if p["hp"] <= 0:
-                if p["faction"] == "丁" and p["death_count"] == 0:
-                    p["hp"] = 2
-                    p["death_count"] = 1
-                    p["revealed"] = True  
-                    socketio.emit('log', {"msg": f"✨ 核心护卫：{p['name']} 触发【丁】免死效果，绝地复活！当前血量变为 2，真实身份公开！"})
-                    deal_card_to_player(p, 2)
-                else:
-                    p["alive"] = False
-                    p["hand"] = []
-                    p["status_hand"] = []
-                    p["status"] = "正常"
-                    socketio.emit('log', {"msg": f"💀 阵亡通告：{p['name']} 饮恨沙场！其最终隐藏身份是【{p['faction']}】。"})
-
-    ji_player = next((p for p in game_state["players"] if p["faction"] == "冀"), None)
-    si_player = next((p for p in game_state["players"] if p["faction"] == "司"), None)
-    if ji_player and not ji_player["alive"]:
-        socketio.emit('log', {"msg": "🏆 战局终结：【司】阵营成功斩首【冀】，获得独立胜利！"})
-        game_state["game_started"] = False
-        return True
-    if si_player and not si_player["alive"]:
-        socketio.emit('log', {"msg": "🏆 战局终结：叛逆者【司】已被剿灭，【丁、冀】同盟阵营共享胜利！"})
-        game_state["game_started"] = False
-        return True
-    return False
-
-def execute_play_card(player_idx, card, target_idx, intent):
-    current_player = game_state["players"][player_idx]
-    if current_player["status"] == "暗度陈仓" and card in ["攻", "防"]: actual_effect = intent
-    else: actual_effect = card 
-
-    current_player["hand"].remove(card)
-    game_state["discard_pile"].append(card)
-    game_state["actions_left"] -= 1  
-
-    if current_player["status"] == "卧薪尝胆" and current_player["hp"] > 1:
-        current_player["hp"] -= 1
-        socketio.emit('log', {"msg": f"⚔️【卧薪尝胆】{current_player['name']} 忍痛出牌，受到 1 点执念自残伤害。"})
-
-    if card != actual_effect:
-        socketio.emit('log', {"msg": f"🎭 诡道：{current_player['name']} 虚晃一枪【暗度陈仓】，将【{card}】伪装成【{actual_effect}】打出！"})
-    
-    target_player = game_state["players"][target_idx] if target_idx != -1 else None
-
-    if actual_effect == "回血":
-        current_player["hp"] += 1
-        socketio.emit('log', {"msg": f"🧪 补给：{current_player['name']} 饮用了【回血】药剂。"})
-    elif actual_effect == "卡牌大师":
-        socketio.emit('log', {"msg": f"🔮 秘术：{current_player['name']} 启动【卡牌大师】，瞬间补充 2 张手牌。"})
-        deal_card_to_player(current_player, 2)
-    elif actual_effect == "同归于尽":
-        game_state["pending_response"] = {"source_idx": player_idx, "target_idx": target_idx, "card": "同归于尽", "required_defenses": 0, "self_damage": 1}
-        socketio.emit('log', {"msg": f"🔥 狂暴：{current_player['name']} 对 {target_player['name']} 发动【同归于尽】！"})
-    elif actual_effect == "荆轲刺秦":
-        game_state["pending_response"] = {"source_idx": player_idx, "target_idx": target_idx, "card": "荆轲刺秦", "required_defenses": 2, "self_damage": 1}
-        socketio.emit('log', {"msg": f"🗡️ 绝杀：{current_player['name']} 对 {target_player['name']} 发动【荆轲刺秦】(目标需连续打出 2 张防)！"})
-    elif actual_effect in ["攻", "一字马", "顺手牵羊", "江山易主"]:
-        game_state["pending_response"] = {"source_idx": player_idx, "target_idx": target_idx, "card": actual_effect, "required_defenses": 1, "self_damage": 0}
-        socketio.emit('log', {"msg": f"🎯 锋芒：{current_player['name']} 锁定了 {target_player['name']}，扔出了一张【{actual_effect}】。"})
-        
-    check_health_and_victory()
-    broadcast_state()
-
-def execute_respond(target_idx, resp_type):
-    pending = game_state["pending_response"]
-    if not pending: return
-    target_player = game_state["players"][target_idx]
-    source_player = game_state["players"][pending["source_idx"]]
-    card_triggered = pending["card"]
-
-    if resp_type == "攻_as_防":
-        target_player["hand"].remove("攻")
-        game_state["discard_pile"].append("攻")
-        resp_type = "防" 
-    elif resp_type == "防":
-        target_player["hand"].remove("防")
-        game_state["discard_pile"].append("防")
-
-    action_resolved = False  
-    cancelled_by_wall = False 
-
-    if resp_type == "防":
-        pending["required_defenses"] -= 1
-        if pending["required_defenses"] > 0:
-            socketio.emit('log', {"msg": f"🛡️ 招架：{target_player['name']} 挡下一击，但【荆轲刺秦】攻势未止，仍需再打出一张【防】！"})
-            broadcast_state()
-            return
-        else:
-            socketio.emit('log', {"msg": f"✨ 闪避：{target_player['name']} 步伐轻盈，化解了本次攻势。"})
-            action_resolved = True
-            game_state["pending_response"] = None
-            
-    elif resp_type == "长城":
-        target_player["hand"].remove("长城")
-        game_state["discard_pile"].append("长城")
-        socketio.emit('log', {"msg": f"🧱 雄关：{target_player['name']} 祭出【长城】防御壁，让对方的【{card_triggered}】烟消瓦解！"})
-        action_resolved = True
-        cancelled_by_wall = True 
-        game_state["pending_response"] = None
-        
-    elif resp_type == "放弃":
-        action_resolved = True
-        if card_triggered == "攻":
-            dmg = 1
-            if target_player["status"] == "卧薪尝胆": dmg -= 1
-            target_player["hp"] -= dmg
-            socketio.emit('log', {"msg": f"💥 💥 命中：{target_player['name']} 放弃挣扎，承受 {dmg} 点伤害。"})
-        elif card_triggered == "荆轲刺秦":
-            dmg = 2
-            if target_player["status"] == "卧薪尝胆": dmg -= 1
-            target_player["hp"] -= dmg
-            socketio.emit('log', {"msg": f"🩸 暴击：刺客得手！{target_player['name']} 痛失 {dmg} 点生命值！"})
-            # 💥【核心修复】：遵循严密结算逻辑，先对别人造成伤害，对方结算完后，出牌者延迟扣血1
-            source_player["hp"] -= 1
-            socketio.emit('log', {"msg": f"☣️ 刺秦反噬：暗杀爆发结束！出牌者 {source_player['name']} 受到反噬伤害扣减 1 点血量。"})
-            pending["self_damage"] = 0 # 已经扣过，清除标志位
-        elif card_triggered == "同归于尽":
-            target_player["hp"] -= 1
-            socketio.emit('log', {"msg": f"💥 碎裂：爆炸波及了 {target_player['name']}，无视防备扣血 1 点。"})
-        elif card_triggered == "一字马":
-            target_player["skip_next_turn"] = True
-            socketio.emit('log', {"msg": f"⛓️ 禁锢：{target_player['name']} 被绊住，下个回合将被强制跳过！"})
-        elif card_triggered == "顺手牵羊":
-            if target_player["hand"]:
-                stolen = random.choice(target_player["hand"])
-                target_player["hand"].remove(stolen)
-                source_player["hand"].append(stolen)
-                socketio.emit('log', {"msg": f"🦅 掠夺：{source_player['name']} 伸手从 {target_player['name']} 的怀里偷走了一张手牌！"})
-        elif card_triggered == "江山易主":
-            target_player["hand"], source_player["hand"] = source_player["hand"], target_player["hand"]
-            socketio.emit('log', {"msg": f"🔄 颠倒乾坤：{source_player['name']} 与 {target_player['name']} 进行了全身手牌大对调！"})
-        game_state["pending_response"] = None
-
-    # 处理其余卡牌的通用自损（如同归于尽）
-    if action_resolved and pending and pending.get("self_damage", 0) > 0:
-        if not cancelled_by_wall:
-            sd = pending["self_damage"]
-            source_player["hp"] -= sd
-            socketio.emit('log', {"msg": f"☣️ 反噬：{source_player['name']} 自身也扣减了 {sd} 点血量。"})
-
-    check_health_and_victory()
-    broadcast_state()
-
-def execute_equip_status(player_idx, card):
-    current_player = game_state["players"][player_idx]
-    current_player["status_hand"].remove(card)
-    current_player["status"] = card
-    current_player["status_cooldown"] = 3 
-    current_player["yinzhen_turns"] = 0   
-    if card == "背水一战": current_player["max_hp"] = 5
-    elif card == "饮鸩止渴": current_player["max_hp"] = 10; current_player["hp"] = 10 
-    elif card == "卧薪尝胆": current_player["max_hp"] = 5
-    socketio.emit('log', {"msg": f"⚡ 觉醒：{current_player['name']} 开启了暴走姿态 ——【{card}】！"})
-    check_health_and_victory()
-    broadcast_state()
-
-def execute_end_turn():
-    current_player = game_state["players"][game_state["current_idx"]]
-    for p in game_state["players"]:
-        if p["alive"] and p.get("status_cooldown", 0) > 0:
-            p["status_cooldown"] -= 1
-
-    if current_player["alive"] and current_player["status"] == "饮鸩止渴":
-        current_player["yinzhen_turns"] += 1
-        if current_player["yinzhen_turns"] % 3 == 0:
-            current_player["max_hp"] = max(1, current_player["max_hp"] - 2)
-            current_player["hp"] = min(current_player["max_hp"], current_player["hp"] + 2)
-            socketio.emit('log', {"msg": f"☣️【饮鸩止渴】慢性爆发！{current_player['name']} 上限永久扣减 2，血量强制调整。"})
-            
-    check_health_and_victory()
-
-    while True:
-        nxt_idx = (game_state["current_idx"] + 1) % len(game_state["players"])
-        game_state["current_idx"] = nxt_idx
-        next_player = game_state["players"][nxt_idx]
-        
-        if nxt_idx == 0:
-            for p in game_state["players"]:
-                if p["alive"] and len(p["hand"]) < 5:
-                    deal_card_to_player(p, 5 - len(p["hand"]))
-            game_state["round"] += 1
-            if game_state["round"] % 2 == 1:
-                refresh_status_hands()
-
-        if not next_player["alive"]: continue
-        if next_player.get("skip_next_turn", False):
-            next_player["skip_next_turn"] = False
-            socketio.emit('log', {"msg": f"⛓️ 系统：{next_player['name']} 受到一字马影响，强行跳过本轮！"})
-            continue 
-        break
-
-    game_state["actions_left"] = min(5, game_state["round"] + 1)
-    if next_player["status"] == "背水一战":
-        game_state["pending_beishui"] = next_player["idx"]
-        socketio.emit('log', {"msg": f"🎲 抉择时分：等待 {next_player['name']} 选择献祭层数。"})
-
-    broadcast_state()
-
-def check_and_trigger_bot():
-    if not game_state["game_started"]: return
-    is_bot_needed = False
-    if game_state["pending_response"] and game_state["players"][game_state["pending_response"]["target_idx"]].get("is_bot"):
-        is_bot_needed = True
-    elif game_state["pending_beishui"] is not None and game_state["players"][game_state["pending_beishui"]].get("is_bot"):
-        is_bot_needed = True
-    elif game_state["players"][game_state["current_idx"]].get("is_bot") and not game_state["pending_response"] and game_state["pending_beishui"] is None:
-        is_bot_needed = True
-
-    if is_bot_needed and not game_state["bot_running"]:
-        game_state["bot_running"] = True
-        socketio.start_background_task(bot_brain_worker)
-
-def bot_brain_worker():
-    socketio.sleep(1.0) 
-    game_state["bot_running"] = False 
-    
-    if not game_state["game_started"]: return
-
-    pending = game_state["pending_response"]
-    if pending:
-        t_idx = pending["target_idx"]
-        bot = game_state["players"][t_idx]
-        if bot.get("is_bot"):
-            card_triggered = pending["card"]
-            has_def = "防" in bot["hand"]
-            has_atk_as_def = (bot["status"] == "暗度陈仓" and "攻" in bot["hand"])
-            has_wall = "长城" in bot["hand"]
-
-            resp = "放弃"
-            if card_triggered in ["攻", "荆轲刺秦"]:
-                if has_def: resp = "防"
-                elif has_atk_as_def: resp = "攻_as_防"
-                elif has_wall: resp = "长城"
-            else:
-                if has_wall: resp = "长城"
-            
-            execute_respond(t_idx, resp)
-            return
-
-    if game_state["pending_beishui"] is not None:
-        b_idx = game_state["pending_beishui"]
-        bot = game_state["players"][b_idx]
-        if bot.get("is_bot"):
-            game_state["pending_beishui"] = None
-            socketio.emit('log', {"msg": f"🤖 {bot['name']} (人机) 开启回合，背水一战稳健放弃自残。"})
-            check_health_and_victory()
-            broadcast_state()
-            return
-
-    c_idx = game_state["current_idx"]
-    bot = game_state["players"][c_idx]
-    if bot.get("is_bot"):
-        if bot["status"] == "正常" and bot.get("status_cooldown", 0) == 0 and bot.get("status_hand"):
-            chosen_status = random.choice(bot["status_hand"])
-            execute_equip_status(c_idx, chosen_status)
-            return 
-
-        if game_state["actions_left"] > 0:
-            opponents = [p["idx"] for p in game_state["players"] if p["alive"] and p["idx"] != c_idx]
-            target_idx = -1
-            if bot["faction"] in ["冀", "司"]:
-                revealed_ding = next((p for p in game_state["players"] if p["alive"] and p["faction"] == "丁" and p.get("revealed")), None)
-                if revealed_ding:
-                    valid_targets = [idx for idx in opponents if idx != revealed_ding["idx"]]
-                    if valid_targets: target_idx = valid_targets[0]
-                        
-            if target_idx == -1 and opponents:
-                target_idx = random.choice(opponents)
-
-            for card in bot["hand"]:
-                if card == "回血" and bot["hp"] < bot["max_hp"]:
-                    execute_play_card(c_idx, "回血", -1, "回血")
-                    return
-                if card == "卡牌大师":
-                    execute_play_card(c_idx, "卡牌大师", -1, "卡牌大师")
-                    return
-                if card in ["攻", "荆轲刺秦", "一字马", "顺手牵羊", "同归于尽", "江山易主"] and target_idx != -1:
-                    execute_play_card(c_idx, card, target_idx, card)
-                    return
-                if card == "防" and bot["status"] == "暗度陈仓" and target_idx != -1:
-                    execute_play_card(c_idx, "防", target_idx, "攻")
-                    return
-
-        socketio.emit('log', {"msg": f"🤖 {bot['name']} (人机) 评估完毕：检测到无牌可出或缺乏行动力，自主结束出牌。"})
-        execute_end_turn()
-
-def start_game_with_bots():
-    needed_bots = 3 - len(game_state["players"])
-    for i in range(needed_bots):
-        idx = len(game_state["players"])
-        game_state["players"].append({
-            "sid": f"bot_virtual_{idx}", "name": f"人机大师-{idx+1}号", "idx": idx, "alive": True,
-            "hp": 5, "max_hp": 5, "hand": [], "status": "正常", "faction": "", "revealed": False, "death_count": 0, "skip_next_turn": False,
-            "status_hand": [], "status_cooldown": 0, "yinzhen_turns": 0, "is_bot": True 
-        })
-    socketio.emit('log', {"msg": f"🚀 战火重燃：满 3 人，已成功补充 {game_state['bot_count']} 名AI选手，直接开局！"})
-    init_game()
+game = GameEngine()
 
 @app.route('/')
-def index(): return render_template('index.html')
+def index():
+    return render_template('index.html')
 
-@socketio.on('join_game')
-def handle_join(data=None):
-    sid = request.sid
-    for p in game_state["players"]:
-        if p["sid"] == sid: return
-    if game_state["game_started"] or len(game_state["players"]) >= 3: 
-        emit('action_error', {"msg": "房间已满员或对局已经开始了哦！"})
+# ==========================================
+# ⚙️ 核心内部辅助业务逻辑
+# ==========================================
+def add_log(msg):
+    game.logs.append(msg)
+    socketio.emit('log', {'msg': msg})
+
+def rebuild_decks():
+    """洗牌池全量重置重构"""
+    game.deck = list(BASIC_CARDS)
+    random.shuffle(game.deck)
+    game.status_deck = list(STATUS_CARDS)
+    random.shuffle(game.status_deck)
+
+def draw_cards(player_idx, count):
+    """绝对安全的玩家摸牌机制"""
+    p = game.players[player_idx]
+    drawn = []
+    for _ in range(count):
+        if not game.deck:
+            rebuild_decks()
+            add_log("🤹 [核心通知] 基本卡牌堆已被抽空，自动重混洗核心弃牌堆！")
+        if game.deck:
+            drawn.append(game.deck.pop(0))
+    p['hand'].extend(drawn)
+
+def broadcast_lobby():
+    """广播同步大厅组队基础看板"""
+    lobby_players = [{"name": p['name']} for p in game.players if not p['is_bot']]
+    socketio.emit('lobby_update', {
+        'count': len(lobby_players),
+        'bot_count': game.bot_count,
+        'players': [{"name": p['name']} for p in game.players]
+    })
+
+def broadcast_state():
+    """阵营情报完全隔离的船新精修级状态同步"""
+    if not game.active: return
+    
+    # 动态锚定当前唯一的真人玩家（用于定制化下发第一视角包，防止真人偷看AI底牌）
+    human_idx = next((i for i, p in enumerate(game.players) if not p['is_bot']), 0)
+    human_player = game.players[human_idx]
+    
+    client_players = []
+    for p in game.players:
+        # 严格的身份黑盒机制：只有自己、死者、或已经明牌的“丁”护卫能向全场展现真实阵营
+        visible_faction = "隐藏"
+        if p['idx'] == human_idx or p['faction_revealed'] or not p['alive']:
+            visible_faction = p['faction']
+            
+        client_players.append({
+            "name": p['name'],
+            "idx": p['idx'],
+            "alive": p['alive'],
+            "hp": p['hp'],
+            "max_hp": p['max_hp'],
+            "faction": visible_faction,
+            "hand_count": len(p['hand']),
+            "status": p['status'],
+            "status_cooldown": p['status_cooldown']
+        })
+        
+    # 动态拦截并解析是否需要弹窗阻断人类玩家进行防御响应
+    is_my_response = False
+    pending_card = ""
+    required_defenses = 0
+    if game.pending_action and game.pending_action['target_idx'] == human_idx:
+        is_my_response = True
+        pending_card = game.pending_action['card']
+        required_defenses = game.pending_action['required_defenses']
+        
+    is_beishui_prompt = False
+    if human_player['status'] == "背水一战" and game.current_idx == human_idx and not human_player['beishui_decided']:
+        is_beishui_prompt = True
+
+    socketio.emit('game_update', {
+        "round": game.round,
+        "current_idx": game.current_idx,
+        "actions_left": game.actions_left,
+        "deck_count": len(game.deck),
+        "my_idx": human_idx,
+        "players": client_players,
+        "my_cards": human_player['hand'],
+        "my_status_cards": human_player['status_cards'],
+        "my_status": human_player['status'],
+        "is_my_response": is_my_response,
+        "pending_card": pending_card,
+        "required_defenses": required_defenses,
+        "is_beishui_prompt": is_beishui_prompt
+    })
+
+# ==========================================
+# 🎮 核心战斗引擎流转
+# ==========================================
+def start_game_engine():
+    game.active = True
+    game.round = 1
+    game.logs = []
+    rebuild_decks()
+    
+    # 绝不重复分配：固定抽出 司(背叛者), 冀(主星), 丁(护卫)
+    factions = ["司", "冀", "丁"]
+    random.shuffle(factions)
+    
+    for i, p in enumerate(game.players):
+        p['faction'] = factions[i]
+        p['alive'] = True
+        p['status'] = "正常"
+        p['status_cooldown'] = 0
+        p['beishui_decided'] = False
+        p['skipped'] = False
+        p['has_revived'] = False
+        
+        if p['faction'] == "冀":
+            p['max_hp'] = 4
+            p['hp'] = 4
+            p['faction_revealed'] = True # 冀作为核心领袖，开局直接明牌
+        else:
+            p['max_hp'] = 3
+            p['hp'] = 3
+            p['faction_revealed'] = False
+            
+        p['hand'] = [game.deck.pop(0) for _ in range(4)]
+        p['status_cards'] = [game.status_deck.pop(0) for _ in range(2)]
+
+    lord_idx = next((i for i, p in enumerate(game.players) if p['faction'] == "冀"), 0)
+    add_log("⚔️ —— 乱世逐鹿，三国kill 精修核心竞技场正式开辟！ ——")
+    add_log("📜 终极天命：【冀】与【丁】结盟互保，【司】需只身击杀【冀】夺取天下！")
+    
+    start_turn(lord_idx)
+
+def start_turn(idx):
+    if not game.active: return
+    p = game.players[idx]
+    if not p['alive']:
+        next_turn()
         return
         
-    idx = len(game_state["players"])
-    p_name = f"战神 {idx + 1}"
-    if data and data.get("name"):
-        custom_name = data.get("name").strip()
-        if custom_name: p_name = custom_name
-
-    game_state["players"].append({
-        "sid": sid, "name": p_name, "idx": idx, "alive": True,
-        "hp": 5, "max_hp": 5, "hand": [], "status": "正常", "faction": "", "revealed": False, "death_count": 0, "skip_next_turn": False,
-        "status_hand": [], "status_cooldown": 0, "yinzhen_turns": 0
-    })
-    socketio.emit('log', {"msg": f"👋 玩家 【{p_name}】 迈入竞技大厅。"})
+    game.current_idx = idx
+    game.actions_left = 2 # 每一个回合重置赋予 2 点行动力上限
+    p['beishui_decided'] = False
     
-    if len(game_state["players"]) + game_state["bot_count"] >= 3:
-        start_game_with_bots()
+    # 检测并清算【一字马】定身控制
+    if p.get('skipped', False):
+        p['skipped'] = False
+        add_log(f"⏰ 【{p['name']}】遭受一字马封印，被强制剥夺本轮全部行动权！")
+        next_turn()
+        return
+
+    # 检测并清算【饮鸩止渴】剧毒侵蚀
+    if p['status'] == "饮鸩止渴":
+        p['status_cooldown'] -= 1
+        if p['status_cooldown'] <= 0:
+            p['max_hp'] = max(1, p['max_hp'] - 2)
+            p['hp'] = min(p['max_hp'], p['hp'] + 2)
+            add_log(f"🧪 【{p['name']}】饮鸩止渴慢性毒发！生命上限缩减2，强行回血2点。")
+            p['status_cooldown'] = 3 # 循环毒发步长
+    elif p['status_cooldown'] > 0:
+        p['status_cooldown'] -= 1
+        if p['status_cooldown'] == 0:
+            p['status'] = "正常"
+            add_log(f"✨ 【{p['name']}】的装备状态效果届满，恢复如初。")
+
+    add_log(f"🎬 —— 当前轮到【{p['name']}】开始进行军事决策 ——")
+    
+    # 状态牌优先切入决策
+    if p['status'] == "背水一战":
+        if p['is_bot']:
+            handle_bot_beishui(idx)
+        else:
+            broadcast_state()
     else:
+        draw_cards(idx, 1) # 正常摸牌阶段
         broadcast_state()
+        trigger_bot_if_needed()
 
-@socketio.on('change_bot_count')
-def handle_change_bot_count(data):
-    if game_state["game_started"]: return
-    try:
-        bc = int(data.get("bot_count", 0))
-        if bc in [0, 1, 2]:
-            game_state["bot_count"] = bc
-            if len(game_state["players"]) + game_state["bot_count"] >= 3:
-                start_game_with_bots()
-            else:
-                broadcast_state()
-    except: pass
+def end_turn_logic():
+    if not game.active: return
+    add_log(f"🏁 【{game.players[game.current_idx]['name']}】宣布鸣金收兵，移交出手权。")
+    next_turn()
 
-@socketio.on('equip_status')
-def handle_equip_status(data):
-    current_player = game_state["players"][game_state["current_idx"]]
-    if current_player["sid"] != request.sid:
-        emit('action_error', {"msg": "❌ 操作失败：现在不是你的回合，无法使用装备牌！"})
-        return
-    if game_state["pending_response"] or game_state["pending_beishui"] is not None:
-        emit('action_error', {"msg": "❌ 操作失败：当前有挂起的博弈结算，请先处理完再用装备！"})
-        return
-    card = data.get("card")
-    if card not in current_player["status_hand"]: return
-    if current_player["status_cooldown"] > 0:
-        emit('action_error', {"msg": "状态牌处于冷却中，无法强行觉醒！"})
-        return
-    execute_equip_status(game_state["current_idx"], card)
-
-@socketio.on('beishui_decision')
-def handle_beishui_decision(data):
-    idx = game_state["pending_beishui"]
-    if idx is None: return
-    player = game_state["players"][idx]
-    if player["sid"] != request.sid: return
-    try: x = int(data.get("sacrifice", 0))
-    except: x = 0
-    if x < 0 or x >= player["hp"]: x = 0
+def next_turn():
+    if not game.active: return
+    attempts = 0
+    next_idx = game.current_idx
+    while attempts < 4:
+        next_idx = (next_idx + 1) % len(game.players)
+        if game.players[next_idx]['alive']:
+            break
+        attempts += 1
+        
+    if next_idx == game.current_idx: return
     
-    if x > 0:
-        player["hp"] -= x
-        socketio.emit('log', {"msg": f"🩸 孤注一掷：{player['name']} 激活【背水一战】自残 {x} 点并狂摸 {x+1} 张牌！"})
-        deal_card_to_player(player, x + 1)
-    game_state["pending_beishui"] = None 
-    check_health_and_victory()
+    if next_idx == 0:
+        game.round += 1
+        if game.round % 2 == 1:
+            rebuild_decks()
+            add_log("🤹 [时空重置] 已触发2轮交替节点，全场弃牌重新大洗牌！")
+            
+    start_turn(next_idx)
+
+# ==========================================
+# 🤖 核心安全网：人机自断尾智能思考大脑
+# ==========================================
+def trigger_bot_if_needed():
+    """全自动轮询推进机，一旦侦测到当前是人机且战场无阻断，立刻驱动人机出牌"""
+    if not game.active or game.pending_action: return
+    
+    curr = game.players[game.current_idx]
+    if curr['alive'] and curr['is_bot']:
+        if curr['status'] == "背水一战" and not curr['beishui_decided']:
+            handle_bot_beishui(game.current_idx)
+            return
+        run_bot_active_move(game.current_idx)
+
+def run_bot_active_move(bot_idx):
+    p = game.players[bot_idx]
+    
+    # 🎯【核心修复哨兵 1】行动力耗尽，绝不粘滞卡死，秒速交权退出！
+    if game.actions_left <= 0 or not p['alive']:
+        end_turn_logic()
+        return
+
+    # 🤖 自动检索并挂载手头的闲置状态牌
+    if p['status'] == "正常" and p['status_cards']:
+        scard = p['status_cards'].pop(0)
+        equip_status_logic(bot_idx, scard)
+        broadcast_state()
+        trigger_bot_if_needed()
+        return
+
+    # 🎯【核心修复哨兵 2】过滤纯防御被动牌，人机绝对不能在主动出牌阶段错甩“防/长城”
+    active_cards = [c for c in p['hand'] if c not in ["防", "长城"]]
+    
+    if not active_cards:
+        add_log(f"🤖 人机【{p['name']}】盘算后发现无任何可主动打出的手牌，优雅鸣金。")
+        end_turn_logic()
+        return
+
+    # 决策优先级判定
+    card = None
+    if "回血" in active_cards and p['hp'] < p['max_hp']:
+        card = "回血"
+    else:
+        playable = [c for c in active_cards if c != "回血"]
+        if playable:
+            card = playable[0]
+            
+    # 🎯【核心修复哨兵 3】虽然有“回血”但血量全满，属于无效牌，同样利落刹车退出！
+    if not card:
+        add_log(f"🤖 人机【{p['name']}】判定手牌无战略下发空间，放弃剩余行动。")
+        end_turn_logic()
+        return
+
+    # 定向搜寻合法对线目标
+    target_idx = -1
+    for i, target in enumerate(game.players):
+        if i != bot_idx and target['alive']:
+            target_idx = i
+            break
+
+    if target_idx == -1:
+        end_turn_logic()
+        return
+
+    # 咔嚓出牌
+    success = execute_play_card(bot_idx, card, target_idx)
+    if not success:
+        end_turn_logic()
+    else:
+        # 如果打出的是功能牌/自打牌（没产生涉及真人的等待阻塞阻断），继续鞭策人机完成连招
+        if not game.pending_action:
+            trigger_bot_if_needed()
+
+def handle_bot_beishui(idx):
+    p = game.players[idx]
+    # AI 聪明决策：只有健康生命层数大于 2 才敢玩命残血大抽牌
+    sac = min(2, p['hp'] - 1) if p['hp'] > 2 else 0
+    execute_beishui_decision(idx, sac)
+
+def handle_bot_defense_response(bot_idx):
+    """当人机在非自己回合遭遇真人突袭攻击时，进行毫秒级自动防御拆招"""
+    if not game.pending_action: return
+    p = game.players[bot_idx]
+    
+    while game.pending_action and game.pending_action['required_defenses'] > 0:
+        # 1. 优先打出必杀技【长城】绝对防御
+        if "长城" in p['hand']:
+            p['hand'].remove("长城")
+            add_log(f"🧱 机器人【{p['name']}】自动开启【长城壁垒】，绝对格挡！")
+            game.pending_action = None
+            break
+            
+        has_def = "防" in p['hand']
+        has_cc_atk = (p['status'] == "暗度陈仓" and "攻" in p['hand'])
+        
+        if has_def:
+            p['hand'].remove("防")
+            game.pending_action['required_defenses'] -= 1
+            add_log(f"🛡️ 机器人【{p['name']}】甩出【防】，闪避层数扣减。")
+        elif has_cc_atk:
+            p['hand'].remove("攻")
+            game.pending_action['required_defenses'] -= 1
+            add_log(f"🎭 机器人【{p['name']}】凭【暗度陈仓】指鹿为马，拿【攻】当【防】抵挡了攻势！")
+        else:
+            # 彻底宣告防守失败，承受痛击
+            card_name = game.pending_action['card']
+            dmg = 2 if card_name == "荆轲刺秦" else 1
+            if p['status'] == "卧薪尝胆" and card_name == "攻":
+                dmg = max(0, dmg - 1)
+                add_log(f"🛡️ 【{p['name']}】触发卧薪尝胆，令本次【攻】的直接伤害降低1点。")
+                
+            damage_player(bot_idx, dmg, reason=card_name)
+            game.pending_action = None
+            break
+            
+    if game.pending_action and game.pending_action['required_defenses'] <= 0:
+        add_log(f"💨 机器人【{p['name']}】使出浑身解数，成功消解本轮多段狂怒袭杀！")
+        game.pending_action = None
+        
+    check_victory_conditions()
     broadcast_state()
 
-@socketio.on('play_card')
-def handle_play_card(data):
-    current_player = game_state["players"][game_state["current_idx"]]
-    if current_player["sid"] != request.sid:
-        emit('action_error', {"msg": "❌ 越权拦截：现在是别人的出牌时间，请等一等哦！"})
-        return
-    if game_state["pending_response"] or game_state["pending_beishui"] is not None:
-        emit('action_error', {"msg": "❌ 越权拦截：战场当前有弹窗响应正在挂起，请先完成处理。"})
-        return
+# ==========================================
+# ⚔️ 核心手牌结算规则厂
+# ==========================================
+def execute_play_card(src_idx, card, tgt_idx):
+    src = game.players[src_idx]
+    tgt = game.players[tgt_idx] if tgt_idx != -1 else None
 
-    card = data.get("card")
-    target_idx = int(data.get("target", -1))
-    intent = data.get("intent", card) 
-    if card not in current_player["hand"]: return
+    if game.actions_left <= 0 or card not in src['hand']: return False
+
+    game.actions_left -= 1
+    src['hand'].remove(card)
+
+    # 卧薪尝胆被动反噬判定
+    if src['status'] == "卧薪尝胆":
+        damage_player(src_idx, 1, reason="卧薪尝胆主动出牌自噬")
+
+    add_log(f"🃏 【{src['name']}】出牌：【{card}】" + (f" ➡️ 目标锁定【{tgt['name']}】" if tgt else ""))
+
+    if card == "回血":
+        src['hp'] = min(src['max_hp'], src['hp'] + 1)
+        add_log(f"💖 【{src['name']}】生命微光闪烁，恢复了1点伤势。")
+    elif card == "卡牌大师":
+        draw_cards(src_idx, 2)
+    elif card == "攻":
+        set_attack_pipeline(src_idx, tgt_idx, "攻", 1)
+    elif card == "荆轲刺秦":
+        set_attack_pipeline(src_idx, tgt_idx, "荆轲刺秦", 2)
+        damage_player(src_idx, 1, reason="荆轲刺秦刺客反噬自损")
+    elif card == "一字马":
+        tgt['skipped'] = True
+        add_log(f"🕸️ 【{tgt['name']}】双脚离地被套上【一字马】定身咒，下轮无法动弹！")
+    elif card == "顺手牵羊":
+        if tgt['hand']:
+            stolen = random.choice(tgt['hand'])
+            tgt['hand'].remove(stolen)
+            src['hand'].append(stolen)
+            add_log(f"🥷 【{src['name']}】诡异探手，暗中顺走了【{tgt['name']}】的1张手牌底牌！")
+        else:
+            add_log(f"💨 【{tgt['name']}】两袖清风，【顺手牵羊】空手而归。")
+    elif card == "江山易主":
+        src['hand'], tgt['hand'] = tgt['hand'], src['hand']
+        add_log(f"🔄 惊天剧变！【{src['name']}】与【{tgt['name']}】将全部手牌进行大挪移互换！")
+    elif card == "同归于尽":
+        damage_player(src_idx, 1, reason="同归于尽伤敌一千")
+        damage_player(tgt_idx, 1, reason="同归于尽自损八百")
     
-    if current_player["status"] == "暗度陈仓" and card in ["攻", "防"]: actual_effect = intent
-    else: actual_effect = card 
+    check_victory_conditions()
+    broadcast_state()
+    return True
 
-    if actual_effect in ["防", "长城"]:
-        emit('action_error', {"msg": "此牌属于被动响应牌，请等敌人打你时，在中央弹窗里点击使用！"})
-        return
-    if game_state["actions_left"] <= 0:
-        emit('action_error', {"msg": "本回合行动力耗尽啦！请点击右侧绿色按钮结束本阶段。"})
-        return
-    if actual_effect in ["攻", "荆轲刺秦", "一字马", "顺手牵羊", "同归于尽", "江山易主"]:
-        if target_idx == -1 or target_idx == game_state["current_idx"]:
-            emit('action_error', {"msg": "🎯 目标锁定失败：此卡属于定向打击牌，请先在上方点击选取其他玩家头像框（亮红圈高亮）再出牌！"})
-            return
-    if actual_effect == "回血" and current_player["hp"] >= current_player["max_hp"]:
-        emit('action_error', {"msg": "血量已满，吃药无效！"})
+def set_attack_pipeline(src_idx, tgt_idx, card, count):
+    """注入打击挂载管道"""
+    tgt = game.players[tgt_idx]
+    # 开局直接判断拦截机器人瞬发防守牌
+    if "长城" in tgt['hand'] and tgt['is_bot']:
+        tgt['hand'].remove("长城")
+        add_log(f"🧱 机器人【{tgt['name']}】瞬发【长城】绝对屏蔽，伤害全免。")
         return
 
-    execute_play_card(game_state["current_idx"], card, target_idx, intent)
+    game.pending_action = {
+        "source_idx": src_idx,
+        "target_idx": tgt_idx,
+        "card": card,
+        "required_defenses": count
+    }
+    
+    if tgt['is_bot']:
+        handle_bot_defense_response(tgt_idx)
+
+def equip_status_logic(idx, status_card):
+    p = game.players[idx]
+    p['status'] = status_card
+    add_log(f"⚡ 【{p['name']}】驱动装载了核心图鉴神技卡：【{status_card}】！")
+    
+    if status_card in ["背水一战", "卧薪尝胆"]:
+        p['max_hp'] = 5
+        p['status_cooldown'] = 3
+    elif status_card == "饮鸩止渴":
+        p['max_hp'] = 10
+        p['hp'] = 10
+        p['status_cooldown'] = 3
+    elif status_card == "暗度陈仓":
+        p['status_cooldown'] = 3
+
+def execute_beishui_decision(idx, sacrifice):
+    p = game.players[idx]
+    p['beishui_decided'] = True
+    
+    if sacrifice > 0:
+        sacrifice = min(sacrifice, p['hp'] - 1)
+        p['hp'] -= sacrifice
+        draw_count = sacrifice + 1
+        add_log(f"🩸 【{p['name']}】疯狂祭出【背水一战】：自残割裂 {sacrifice} 血，狂揽暴抽 {draw_count} 张新手牌！")
+        draw_cards(idx, draw_count)
+    else:
+        add_log(f"🛡️ 【{p['name']}】在【背水一战】中选择常规平稳发育，常规摸牌 1 张。")
+        draw_cards(idx, 1)
+        
+    broadcast_state()
+    trigger_bot_if_needed()
+
+def damage_player(idx, amount, reason=""):
+    if amount <= 0: return
+    p = game.players[idx]
+    p['hp'] -= amount
+    add_log(f"💥 【{p['name']}】因【{reason}】遭受了 {amount} 点致死级重创！")
+    
+    # 🛡️ 守护丁（丁）原地满血爆牌复活机制
+    if p['hp'] <= 0 and p['faction'] == "丁" and not p.get('has_revived', False):
+        p['has_revived'] = True
+        p['faction_revealed'] = True
+        p['hp'] = 2
+        p['max_hp'] = max(p['max_hp'], 2)
+        add_log(f"🔥✨ 【🛡️ 护卫不灭】玩家【{p['name']}】突破濒死线复苏！【丁】爆开真身，原地强行归位回血2层，并狂抽2张底牌！")
+        draw_cards(idx, 2)
+        
+    if p['hp'] <= 0:
+        p['hp'] = 0
+        p['alive'] = False
+        p['faction_revealed'] = True
+        add_log(f"💀🪦 讣告：玩家【{p['name']}】支撑不住，宣布阵亡！临终公布真实内幕身份为：【{p['faction']}】")
+        p['hand'] = []
+        p['status_cards'] = []
+        p['status'] = "正常"
+
+def check_victory_conditions():
+    """阵营绝对胜负清算器"""
+    if not game.active: return
+    si_alive = any(p['alive'] for p in game.players if p['faction'] == "司")
+    ji_alive = any(p['alive'] for p in game.players if p['faction'] == "冀")
+    
+    if not ji_alive:
+        game.active = False
+        add_log("🏆👑 【大局已定】弑主反叛成功！乱臣【司】越塔击碎主星【冀】，夺得江山天下大胜！")
+        broadcast_state()
+        return
+        
+    if not si_alive:
+        game.active = False
+        add_log("🏆🌟 【大局已定】帝星万世长明！守护盟军【冀】与【丁】成功剿灭叛贼【司】，迎来破晓大胜！")
+        broadcast_state()
+        return
+
+# ==========================================
+# 📡 Socket.IO 前后端全网交互网关
+# ==========================================
+@socketio.on('change_bot_count')
+def on_change_bot_count(data):
+    if not game.active:
+        game.bot_count = int(data.get('bot_count', 2))
+        broadcast_lobby()
+
+@socketio.on('join_game')
+def on_join_game(data):
+    if game.active:
+        emit('action_error', {'msg': '战局正酣，请勿强行破门！如需重来请点击大厅顶部暴力重置。'})
+        return
+        
+    name = data.get('name', '').strip()
+    if not name: name = f"玩家_{random.randint(100,999)}"
+    
+    # 强制单真人速开沙盒过滤，防止由于多开导致的状态混乱
+    game.players = [{
+        "name": name, "idx": 0, "is_bot": False, "alive": True, "hp": 3, "max_hp": 3,
+        "faction": "隐藏", "faction_revealed": False, "status": "正常", "status_cooldown": 0,
+        "hand": [], "status_cards": [], "beishui_decided": False, "skipped": False, "has_revived": False
+    }]
+    
+    # 自动根据玩家设置的人机数量补全队伍，保证任何时候点击“确认加入”都能直接开始3人激战！
+    needed_bots = 3 - len(game.players)
+    bot_pool = ["🤖 诸葛人机", "🤖 曹操硅基", "🤖 司马算力"]
+    for i in range(needed_bots):
+        game.players.append({
+            "name": bot_pool[i % len(bot_pool)], "idx": len(game.players), "is_bot": True, "alive": True,
+            "hp": 3, "max_hp": 3, "faction": "隐藏", "faction_revealed": False, "status": "正常",
+            "status_cooldown": 0, "hand": [], "status_cards": [], "beishui_decided": False, "skipped": False, "has_revived": False
+        })
+        
+    start_game_engine()
+
+@socketio.on('play_card')
+def on_play_card(data):
+    if not game.active or game.pending_action: return
+    card = data.get('card')
+    tgt_idx = data.get('target', -1)
+    intent = data.get('intent') # 捕获陈仓变形金刚意图
+    
+    human_idx = next((i for i, p in enumerate(game.players) if not p['is_bot']), 0)
+    if game.current_idx != human_idx:
+        emit('action_error', {'msg': '🚨 冷静！现在是机器人的出牌思考流转，请勿乱动！'})
+        return
+        
+    p = game.players[human_idx]
+    # 暗度陈仓奇袭技能代理
+    if p['status'] == "暗度陈仓" and intent == "攻" and card == "防":
+        if "防" in p['hand']:
+            p['hand'].remove("防")
+            p['hand'].append("攻")
+            card = "攻"
+
+    success = execute_play_card(human_idx, card, tgt_idx)
+    if not success:
+        emit('action_error', {'msg': '❌ 无法打出该手牌（可能是行动力耗尽或卡牌不合法）'})
+    else:
+        trigger_bot_if_needed()
+
+@socketio.on('equip_status')
+def on_equip_status(data):
+    if not game.active or game.pending_action: return
+    card = data.get('card')
+    
+    human_idx = next((i for i, p in enumerate(game.players) if not p['is_bot']), 0)
+    if game.current_idx != human_idx: return
+    
+    p = game.players[human_idx]
+    if card not in p['status_cards'] or p['status_cooldown'] > 0:
+        emit('action_error', {'msg': '🚨 该状态卡环正处于CD或不属于你！'})
+        return
+        
+    p['status_cards'].remove(card)
+    equip_status_logic(human_idx, card)
+    broadcast_state()
+    trigger_bot_if_needed()
 
 @socketio.on('respond_action')
-def handle_respond(data):
-    resp_type = data.get("type") 
-    pending = game_state["pending_response"]
-    if not pending: return
-    target_player = game_state["players"][pending["target_idx"]]
-    if target_player["sid"] != request.sid: return
-    execute_respond(pending["target_idx"], resp_type)
+def on_respond_action(data):
+    """当真人遭到人机攻击，在屏幕中央弹窗点击抗击时的处理插座"""
+    if not game.active or not game.pending_action: return
+    resp_type = data.get('type') # '防', '攻_as_防', '长城', '放弃'
+    tgt_idx = game.pending_action['target_idx']
+    p = game.players[tgt_idx]
+    card_name = game.pending_action['card']
+    
+    if resp_type == '长城' and "长城" in p['hand']:
+        p['hand'].remove("长城")
+        add_log(f"🧱 【{p['name']}】祭出【长城】绝对防御，物理偏转本次袭击！")
+        game.pending_action = None
+    elif resp_type == '防' and "防" in p['hand']:
+        p['hand'].remove("防")
+        game.pending_action['required_defenses'] -= 1
+        add_log(f"🛡️ 【{p['name']}】消耗1张【防】完成一次招架。")
+    elif resp_type == '攻_as_防' and p['status'] == "暗度陈仓" and "攻" in p['hand']:
+        p['hand'].remove("攻")
+        game.pending_action['required_defenses'] -= 1
+        add_log(f"🎭 【{p['name']}】发动【暗度陈仓】，横刀将【攻】作【防】抗下了这一击！")
+    elif resp_type == '放弃':
+        dmg = 2 if card_name == "荆轲刺秦" else 1
+        if p['status'] == "卧薪尝胆" and card_name == "攻":
+            dmg = max(0, dmg - 1)
+        damage_player(tgt_idx, dmg, reason=card_name)
+        game.pending_action = None
+        
+    if game.pending_action and game.pending_action['required_defenses'] <= 0:
+        add_log(f"✨ 【{p['name']}】闪避护甲拉满，完好无损地挡下了全套重击。")
+        game.pending_action = None
+
+    check_victory_conditions()
+    broadcast_state()
+    # 真人防御判定结束后，若现在仍为人机回合，驱动人机继续进行接下来的连招
+    trigger_bot_if_needed()
+
+@socketio.on('beishui_decision')
+def on_beishui_decision(data):
+    if not game.active: return
+    sacrifice = int(data.get('sacrifice', 0))
+    human_idx = next((i for i, p in enumerate(game.players) if not p['is_bot']), 0)
+    
+    if game.current_idx != human_idx: return
+    p = game.players[human_idx]
+    if p['status'] != "背水一战" or p['beishui_decided']: return
+    
+    execute_beishui_decision(human_idx, sacrifice)
 
 @socketio.on('end_turn')
-def handle_end_turn():
-    if game_state["players"][game_state["current_idx"]]["sid"] != request.sid or game_state["pending_response"] or game_state["pending_beishui"] is not None: 
-        emit('action_error', {"msg": "❌ 越权拦截：现在不能交出回合。"})
-        return
-    execute_end_turn()
+def on_end_turn():
+    human_idx = next((i for i, p in enumerate(game.players) if not p['is_bot']), 0)
+    if game.current_idx != human_idx: return
+    end_turn_logic()
 
 @socketio.on('reset_game')
-def handle_reset():
-    global game_state
-    game_state = {
-        "players": [], "deck": [], "discard_pile": [], "round": 1, "current_idx": 0,
-        "actions_left": 2, "game_started": False, "pending_response": None, "pending_beishui": None,
-        "bot_count": 0, "bot_running": False
-    }
+def on_reset_game():
+    game.reset()
+    add_log("🔄 房主执行了最高级别的暴力重置房间代码，网页即将全面强制冲洗刷新！")
     socketio.emit('force_reload_all')
 
 if __name__ == '__main__':
-    socketio.run(app, debug=True, host='0.0.0.0', port=5000)
+    # 绑定 5000 端口，开启 Debug 高速自热重载
+    socketio.run(app, debug=True, port=5000)
