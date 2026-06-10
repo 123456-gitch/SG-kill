@@ -25,7 +25,7 @@
         .players-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px; }
         .player-card { background: #162447; border: 3px solid #1f4068; border-radius: 10px; padding: 15px; position: relative; cursor: pointer; transition: 0.2s; }
         
-        /* 💥【核心修复】：点触后的高亮，直接更变为纯正亮红色发光“红色的圈圈”框体 */
+        /* 红圈锁敌视觉高亮 */
         .player-card.selected-target { 
             border: 4px solid #ff0000 !important; 
             box-shadow: 0 0 25px #ff0000 !important;
@@ -46,7 +46,7 @@
         }
 
         .player-card.active-turn { border-color: #ffb423 !important; background: #223663; }
-        .player-card.dead { background: #2d2d3a !important; border-color: #4a4a5a !important; opacity: 0.6; }
+        .player-card.dead { background: #2d2d3a !important; border-color: #4a4a5a !important; opacity: 0.6; cursor: not-allowed; }
         
         .p-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; border-bottom: 1px solid #1f4068; padding-bottom: 5px; }
         .p-name { font-weight: bold; color: #fff; font-size: 15px; }
@@ -103,7 +103,7 @@
 <body>
 
     <header>
-        <h1>三国kill · 官方精修核心场</h1>
+        <h1><h1>三国kill · 官方精修核心场</h1></h1>
         <div id="game-meta" style="font-size: 13px; color: #cbd5e1;">大厅集结中...</div>
         <button class="btn" style="width:auto; padding:5px 12px; font-size:12px;" onclick="resetGame()">暴力重置房间</button>
     </header>
@@ -210,18 +210,24 @@
             socket.emit('reset_game');
         }
 
+        // 💥【核心硬伤完全修复】：将点击校验和状态捕获完美集成到纯粹的 JS 函数作用域内
         function selectTarget(idx) {
-            // 💥【核心修复】：不能点选自己
             if (idx === myIndex) {
                 alert("🚩 操作提示：不能锁定你自己哦！请点击其他玩家头像框进行对线锁定。");
                 return;
             }
+            
+            const tgtCard = document.getElementById(`pcard-${idx}`);
+            if (tgtCard && tgtCard.classList.contains('dead')) {
+                alert("💀 目标已阵亡，请放过他，换一个对手锁定吧！");
+                return;
+            }
+
             selectedTargetIdx = idx;
             const cards = document.getElementsByClassName('player-card');
             for(let card of cards) {
                 card.classList.remove('selected-target');
             }
-            const tgtCard = document.getElementById(`pcard-${idx}`);
             if (tgtCard) tgtCard.classList.add('selected-target');
         }
 
@@ -270,7 +276,6 @@
             `;
         });
 
-        // 💥【关键数据流对齐】：注入 my_idx 确保前端彻底捕获主体身份信息
         socket.on('game_update', (data) => {
             document.getElementById("lobby").style.display = "none";
             document.getElementById("game-board").style.display = "block";
@@ -283,7 +288,6 @@
             const activePlayerName = data.players[data.current_idx].name;
             const isMyTurn = (data.current_idx === myIndex);
             
-            // 顶端局势摘要
             document.getElementById("game-meta").innerHTML = `
                 <span><b>第 ${data.round} 轮</b></span> | 
                 <span style="color:#ffb423;">当前出牌方：<b>${activePlayerName}</b></span> | 
@@ -291,7 +295,6 @@
                 <span>基本牌堆：${data.deck_count} 张</span>
             `;
 
-            // 底层面板行动状态横幅提示
             const titleAnchor = document.getElementById("action-turn-title");
             if (isMyTurn) {
                 titleAnchor.innerHTML = "🟢 【现在是你的出牌回合】请点击可用手牌发动攻势：";
@@ -316,8 +319,9 @@
                 for(let h=0; h<p.hp; h++) hpHearts += "❤️";
                 for(let m=p.hp; m<p.max_hp; m++) hpHearts += "🖤";
 
+                // 💥【核心修复】：去除 onclick 字符串里的不可用变量表达式，安全干净地传递 p.idx
                 anchor.innerHTML += `
-                    <div class="${cardClass}" id="pcard-${p.idx}" onclick="p.alive && selectTarget(${p.idx})">
+                    <div class="${cardClass}" id="pcard-${p.idx}" onclick="selectTarget(${p.idx})">
                         <div class="p-header">
                             <span class="p-name">${p.name} ${p.idx === myIndex ? '<span style="color:#00fff0;">(你)</span>' : ''}</span>
                             <span class="faction-tag fac-${p.faction}">${p.faction}</span>
@@ -335,7 +339,6 @@
                 selectedTargetIdx = -1; 
             }
 
-            // 渲染基本作战手牌
             const handAnchor = document.getElementById("basic-hand-anchor");
             handAnchor.innerHTML = "";
             data.my_cards.forEach(card => {
@@ -364,7 +367,6 @@
                 }
             });
 
-            // 渲染状态卡牌
             const statusAnchor = document.getElementById("status-hand-anchor");
             statusAnchor.innerHTML = "";
             let mySummary = data.players.find(p => p.idx === myIndex);
@@ -378,7 +380,6 @@
                 `;
             });
 
-            // 被动响应弹窗区
             const promptAnchor = document.getElementById("prompt-zone");
             promptAnchor.innerHTML = "";
 
