@@ -67,7 +67,16 @@ def refresh_status_hands():
     socketio.emit('log', {"msg": "系统：状态牌备选池已更新（状态牌未装备前不生效）。"})
 
 def broadcast_state():
-    if not game_state["game_started"]: return
+    # 🚨【同步大厅改造】：如果游戏还没正式发牌开始，就广播大厅状态，统一所有人的等待界面
+    if not game_state["game_started"]:
+        lobby_summary = [{"name": p["name"], "idx": p["idx"]} for p in game_state["players"]]
+        socketio.emit('lobby_update', {
+            "players": lobby_summary,
+            "count": len(game_state["players"])
+        })
+        return
+
+    # 游戏正式开始后的同步逻辑（原封不动保留你全部的核心机制）
     for observer in game_state["players"]:
         players_summary = []
         for p in game_state["players"]:
@@ -168,23 +177,37 @@ def check_health_and_victory():
 @app.route('/')
 def index(): return render_template('index.html')
 
+# 🚨【核心修改】监听前端点击加入房间并传递名字的动作
 @socketio.on('join_game')
-def handle_join():
+def handle_join(data=None):
     sid = request.sid
     for p in game_state["players"]:
         if p["sid"] == sid: return
-    if game_state["game_started"] or len(game_state["players"]) >= 3: return
+    if game_state["game_started"] or len(game_state["players"]) >= 3: 
+        emit('action_error', {"msg": "对不起，房间人数已满或对局已开始！"})
+        return
+        
     idx = len(game_state["players"])
+    # 读取玩家输入的名字，如果没有输入则默认分配玩家编号
     p_name = f"玩家 {idx + 1}"
+    if data and data.get("name"):
+        custom_name = data.get("name").strip()
+        if custom_name:
+            p_name = custom_name
+
     game_state["players"].append({
         "sid": sid, "name": p_name, "idx": idx, "alive": True,
         "hp": 5, "max_hp": 5, "hand": [], "status": "正常", "faction": "", "revealed": False, "death_count": 0, "skip_next_turn": False,
         "status_hand": [], "status_cooldown": 0, "yinzhen_turns": 0
     })
-    socketio.emit('log', {"msg": f"系统：{p_name} 进入游戏。"})
+    
+    socketio.emit('log', {"msg": f"系统：【{p_name}】已经进入房间（座位号: {idx + 1}）。"})
+    
     if len(game_state["players"]) == 3:
+        socketio.emit('log', {"msg": "系统：人员已满3人！诸侯割据，游戏即刻开始！"})
         init_game()
-    broadcast_state()
+    else:
+        broadcast_state()
 
 @socketio.on('equip_status')
 def handle_equip_status(data):
