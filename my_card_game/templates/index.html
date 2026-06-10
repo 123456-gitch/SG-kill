@@ -12,6 +12,11 @@
         .header-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 2px solid #ff9800; padding-bottom: 10px; }
         .rule-btn { background: #00adb5; color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-weight: bold; }
         
+        /* 🚨 新增准备大厅模块样式 */
+        .lobby-box { background: #333; padding: 25px; border-radius: 8px; border: 2px dashed #00adb5; text-align: center; margin-bottom: 25px; }
+        .lobby-input-group { display: flex; gap: 10px; max-width: 450px; margin: 15px auto; }
+        .lobby-input { flex: 1; padding: 10px; background: #111; color: #fff; border: 1px solid #555; border-radius: 4px; font-size: 15px; }
+        
         .player-card { background: #3a3a3a; padding: 12px; margin: 10px 0; border-radius: 8px; cursor: pointer; border: 2.5px solid transparent; transition: all 0.2s ease-in-out; }
         .player-card.active-turn { border-color: #ff9800; background: #382d22; }
         .player-card.selected-target { border-color: #e91e63 !important; box-shadow: 0 0 15px #e91e63; background: #4a1525 !important; }
@@ -50,33 +55,49 @@
             <button class="rule-btn" onclick="openRules()">查看卡牌说明与规则</button>
         </div>
         
-        <div id="round-info" style="font-size:14px; color:#ff9800; margin-bottom:15px; font-weight:bold;">正在读取游戏数据...</div>
-        
-        <div class="section-title">👥 存活玩家列表（请点击选择一个目标玩家进行出牌）</div>
-        <div id="players-list"></div>
-
-        <div id="beishui-area" class="beishui-box">
-            <h3 style="margin-top:0; color:#00adb5;">【背水一战】效果选择</h3>
-            <p>你当前装备了【背水一战】，请选择本回合开始前失去多少点生命值以换取摸牌：</p>
-            <div style="margin-bottom: 10px;">
-                选择失去生命值: <input type="number" id="beishui-val" min="0" value="0" style="width: 60px; padding: 4px;"> 点 
+        <div id="lobby-area" class="lobby-box">
+            <h3 style="color: #00adb5; margin-top: 0;">⚔️ 联机准备大厅 ⚔️</h3>
+            <div id="lobby-status" style="font-size: 15px; color: #ff9800; margin-bottom: 10px;">已成功连接至游戏服务器！</div>
+            
+            <div id="lobby-controls" class="lobby-input-group">
+                <input type="text" id="nickname-input" class="lobby-input" placeholder="请输入你的英雄专属昵称..." />
+                <button class="btn btn-status" id="join-room-btn" onclick="joinRoomAction()">确认加入房间</button>
             </div>
-            <button class="btn btn-status" onclick="submitBeishui()">确认</button>
+            
+            <div id="lobby-players-list" style="margin-top: 20px; font-size: 14px; background: #222; padding: 12px; border-radius: 6px; color: #ddd;">
+                等待玩家入座...
+            </div>
         </div>
 
-        <div id="response-area" class="response-box">
-            <h4 id="response-tips" style="margin-top:0; color:#ff5722;"></h4>
-            <div id="response-buttons"></div>
-        </div>
+        <div id="game-play-area" style="display: none;">
+            <div id="round-info" style="font-size:14px; color:#ff9800; margin-bottom:15px; font-weight:bold;">正在读取游戏数据...</div>
+            
+            <div class="section-title">👥 存活玩家列表（请点击选择一个目标玩家进行出牌）</div>
+            <div id="players-list"></div>
 
-        <div class="section-title">🔮 状态手牌区（注意：状态牌在此区域时不生效，必须点击装备后才生效）</div>
-        <div id="status-hand" class="hand-area"></div>
+            <div id="beishui-area" class="beishui-box">
+                <h3 style="margin-top:0; color:#00adb5;">【背水一战】效果选择</h3>
+                <p>你当前装备了【背水一战】，请选择本回合开始前失去多少点生命值以换取摸牌：</p>
+                <div style="margin-bottom: 10px;">
+                    选择失去生命值: <input type="number" id="beishui-val" min="0" value="0" style="width: 60px; padding: 4px;"> 点 
+                </div>
+                <button class="btn btn-status" onclick="submitBeishui()">确认</button>
+            </div>
 
-        <div class="section-title">🎴 基本牌手牌（手牌上限初始为5张，每轮结束时若不足5张将自动补满）</div>
-        <div id="my-hand" class="hand-area"></div>
-        
-        <div style="margin-top: 25px;">
-            <button class="btn btn-danger" style="font-size:14px; padding:10px 22px;" onclick="endTurn()">结束我的出牌阶段</button>
+            <div id="response-area" class="response-box">
+                <h4 id="response-tips" style="margin-top:0; color:#ff5722;"></h4>
+                <div id="response-buttons"></div>
+            </div>
+
+            <div class="section-title">🔮 状态手牌区（注意：状态牌在此区域时不生效，必须点击装备后才生效）</div>
+            <div id="status-hand" class="hand-area"></div>
+
+            <div class="section-title">🎴 基本牌手牌（手牌上限初始为5张，每轮结束时若不足5张将自动补满）</div>
+            <div id="my-hand" class="hand-area"></div>
+            
+            <div style="margin-top: 25px;">
+                <button class="btn btn-danger" style="font-size:14px; padding:10px 22px;" onclick="endTurn()">结束我的出牌阶段</button>
+            </div>
         </div>
     </div>
 
@@ -135,10 +156,30 @@
     const socket = io();
     let selectedTargetIdx = -1;
 
-    socket.on('connect', () => { socket.emit('join_game'); });
+    // 连接成功后，修改原本默认直接进组的逻辑，改为等待玩家手动输入名字并点击按钮
+    socket.on('connect', () => { 
+        document.getElementById('lobby-status').innerText = "已连接云服务器。请在下方输入专属名字加入战场！";
+    });
+
     socket.on('action_error', (data) => { alert(data.msg); });
 
+    // 🚨【新增大厅同步接收】听从服务器大喇叭：全剧组同步刷新目前房间已有几人
+    socket.on('lobby_update', (data) => {
+        document.getElementById('lobby-area').style.display = 'block';
+        document.getElementById('game-play-area').style.display = 'none';
+        
+        document.getElementById('lobby-status').innerText = `正在等待群雄割据... 当前房间人数：${data.count} / 3 人`;
+        
+        const formatPlayers = data.players.map((p, i) => `<strong>[座位 ${i+1}]</strong> <span style="color:#00adb5;">${p.name}</span>`).join(' &nbsp;&nbsp;|&nbsp;&nbsp; ');
+        document.getElementById('lobby-players-list').innerHTML = `当前已落座玩家：${formatPlayers}`;
+    });
+
+    // 接收游戏对局数据（原汁原味逻辑，前缀强行加入了界面控制切换）
     socket.on('game_update', (data) => {
+        // 🚨 一旦服务器开始，强制同步关闭准备大厅，展现沙场对局界面！
+        document.getElementById('lobby-area').style.display = 'none';
+        document.getElementById('game-play-area').style.display = 'block';
+
         const activeP = data.players.find(p => p.idx === data.current_idx);
         
         document.getElementById('round-info').innerHTML = `当前：第 ${data.round} 轮 | 当前出牌玩家：<span>${activeP ? activeP.name : '未知'}</span> | 剩余行动次数：<strong>${data.actions_left}</strong> 次 | 牌堆剩余：${data.deck_count} 张`;
@@ -251,6 +292,18 @@
         box.innerHTML += `<div>${data.msg}</div>`;
         box.scrollTop = box.scrollHeight;
     });
+
+    // 🚨【新增点击大厅加入动作】
+    function joinRoomAction() {
+        const nameVal = document.getElementById('nickname-input').value.trim();
+        if (!nameVal) {
+            alert("请输入您的昵称再加入游戏！");
+            return;
+        }
+        socket.emit('join_game', { name: nameVal });
+        document.getElementById('lobby-controls').style.display = 'none';
+        document.getElementById('lobby-status').innerText = "已入座！正等候其他好汉组局...";
+    }
 
     function submitBeishui() {
         const val = document.getElementById('beishui-val').value;
