@@ -8,12 +8,11 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'sg_ultimate_match_2026_fixed'
 socketio = SocketIO(app, cors_allowed_origins="*")
 
-# ✅ 问题5：总基本牌200张
 BASIC_CARDS = (
     ["攻"] * 50 + ["防"] * 45 + ["长城"] * 20 + ["回血"] * 25 + 
     ["卡牌大师"] * 20 + ["荆轲刺秦"] * 8 + ["一字马"] * 8 + 
     ["顺手牵羊"] * 15 + ["江山易主"] * 4 + ["同归于尽"] * 5
-)  # 50+45+20+25+20+8+8+15+4+5 = 200张！
+)
 STATUS_CARDS = ["背水一战", "饮鸩止渴", "卧薪尝胆", "暗度陈仓"]
 
 class GameEngine:
@@ -158,12 +157,12 @@ def start_game_engine():
         p['max_hp'] = 5
         p['hp'] = 5
         p['faction_revealed'] = False
-        p['hand'] = [game.deck.pop(0) for _ in range(5)]  # ✅ 5×3=15张，200-15=185张
+        p['hand'] = [game.deck.pop(0) for _ in range(5)]
         p['status_cards'] = [game.status_deck.pop(0) for _ in range(2)]
 
     first_idx = random.randint(0, 2)
     game.current_idx = first_idx
-    game.actions_left = game.round + 1  # ✅ 问题2：正常来，第1轮=2
+    game.actions_left = game.round + 1
     
     add_log("⚔️ —— 游戏开始！ ——")
     add_log(f"🎬 轮到【{game.players[first_idx]['name']}】出牌")
@@ -179,14 +178,14 @@ def start_turn(idx):
         return
         
     game.current_idx = idx
-    game.actions_left = game.round + 1  # ✅ 问题2：第x轮=x+1
+    game.actions_left = game.round + 1
     p['beishui_decided'] = False
     
+    # ✅ 修复3：状态牌CD到0只是可以换，不消失！继续保留效果
     if p['status_cooldown'] > 0:
         p['status_cooldown'] -= 1
         if p['status_cooldown'] == 0:
-            add_log(f"✨ 【{p['name']}】的【{p['status']}】结束，可以换新状态！")
-            p['status'] = "正常"
+            add_log(f"✨ 【{p['name']}】的【{p['status']}】CD已到，可以更换新状态了（也可继续保留）")
     
     if p['status'] == "饮鸩止渴":
         p['max_hp'] = max(1, p['max_hp'] - 3)
@@ -244,7 +243,7 @@ def next_turn():
     start_turn(next_idx)
 
 # ==========================================
-# 🤖 人机AI - 问题4修复
+# 🤖 人机AI
 # ==========================================
 def trigger_bot_if_needed():
     if not game.active or game.pending_action: return
@@ -256,7 +255,6 @@ def trigger_bot_if_needed():
                 handle_bot_beishui(game.current_idx)
             threading.Thread(target=delayed_beishui, daemon=True).start()
             return
-        # ✅ 问题7：只有人机需要等1.5秒
         def delayed_bot_move():
             time.sleep(1.5)
             run_bot_active_move(game.current_idx)
@@ -297,26 +295,21 @@ def run_bot_active_move(bot_idx):
         end_turn_logic()
         return
 
-    # ✅✅✅ 问题4：人机攻击逻辑
     living_enemies = [target for target in game.players if target['idx'] != bot_idx and target['alive']]
     
     if p['faction'] == "丁":
-        # 丁永远随机打
         target_idx = random.choice(living_enemies)['idx']
     else:
-        # 检查丁是否已经公开（复活过或死亡）
         ding_revealed = any(t['faction'] == "丁" and (t.get('has_revived', False) or not t['alive']) 
                            for t in game.players)
         
         if ding_revealed:
-            # 知道谁是丁了，只打不是丁的
             non_ding_targets = [t for t in living_enemies if t['faction'] != "丁"]
             if non_ding_targets:
                 target_idx = random.choice(non_ding_targets)['idx']
             else:
                 target_idx = random.choice(living_enemies)['idx']
         else:
-            # 不知道丁是谁，随机打
             target_idx = random.choice(living_enemies)['idx']
 
     success = execute_play_card(bot_idx, card, target_idx)
@@ -332,7 +325,6 @@ def run_bot_active_move(bot_idx):
 
 def handle_bot_beishui(idx):
     p = game.players[idx]
-    # ✅ 问题1：可以扣到剩1血，5血最多扣4血
     sac = min(p['hp'] - 1, 3) if p['hp'] > 1 else 0
     execute_beishui_decision(idx, sac)
 
@@ -352,6 +344,14 @@ def handle_bot_defense_response(bot_idx):
             p['hand'].remove("防")
             game.pending_action['required_defenses'] -= 1
             add_log(f"🛡️ 机器人【防】")
+            if game.pending_action['required_defenses'] <= 0:
+                add_log(f"✅ 机器人防御成功！")
+                game.pending_action = None
+        elif p['status'] == "暗度陈仓" and "攻" in p['hand'] and game.pending_action['card'] in ["攻", "荆轲刺秦"]:
+            # ✅ 修复4：防御时暗度陈仓把攻当防
+            p['hand'].remove("攻")
+            game.pending_action['required_defenses'] -= 1
+            add_log(f"🎭 机器人【暗度陈仓】以攻代防！")
             if game.pending_action['required_defenses'] <= 0:
                 add_log(f"✅ 机器人防御成功！")
                 game.pending_action = None
@@ -378,9 +378,10 @@ def execute_play_card(src_idx, card, tgt_idx):
     game.actions_left -= 1
     src['hand'].remove(card)
 
+    # ✅ 修复1：卧薪尝胆主动出牌反噬（回血除外），最低1血不死
     if src['status'] == "卧薪尝胆" and card != "回血":
         src['hp'] = max(1, src['hp'] - 1)
-        add_log(f"🔥 卧薪尝胆反噬-1血")
+        add_log(f"🔥 卧薪尝胆执念反噬，自损1血")
 
     if card in ["回血", "卡牌大师"]:
         add_log(f"🃏 【{src['name']}】打出【{card}】")
@@ -398,7 +399,6 @@ def execute_play_card(src_idx, card, tgt_idx):
         draw_cards(src_idx, 2)
     elif card == "荆轲刺秦":
         set_attack_pipeline(src_idx, tgt_idx, "荆轲刺秦", 2)
-        # ✅ 问题3：荆轲刺秦反噬，使用者掉1血
         damage_player(src_idx, 1, "荆轲刺秦反噬")
     else:
         set_attack_pipeline(src_idx, tgt_idx, card, 1)
@@ -437,9 +437,21 @@ def execute_card_effect(src_idx, tgt_idx, card):
     tgt = game.players[tgt_idx]
     
     if card == "攻":
-        damage_player(tgt_idx, 1, "攻")
+        # ✅ 修复1：卧薪尝胆受攻减1伤
+        dmg = 1
+        if tgt['status'] == "卧薪尝胆":
+            dmg = max(0, dmg - 1)
+            if dmg == 0:
+                add_log(f"🛡️ 【{tgt['name']}】卧薪尝胆减伤生效，伤害归零！")
+        if dmg > 0:
+            damage_player(tgt_idx, dmg, "攻")
     elif card == "荆轲刺秦":
-        damage_player(tgt_idx, 2, "荆轲刺秦")
+        # ✅ 修复2：荆轲刺秦2点伤害，卧薪尝胆只减1点
+        dmg = 2
+        if tgt['status'] == "卧薪尝胆":
+            dmg = max(0, dmg - 1)
+            add_log(f"🛡️ 【{tgt['name']}】卧薪尝胆减伤1点！")
+        damage_player(tgt_idx, dmg, "荆轲刺秦")
     elif card == "一字马":
         tgt['skipped'] = True
         add_log(f"🔒 【{tgt['name']}】被封印！")
@@ -460,7 +472,7 @@ def equip_status_logic(idx, status_card):
     p = game.players[idx]
     p['status'] = status_card
     p['status_cooldown'] = 3
-    add_log(f"⚡ 【{p['name']}】装备【{status_card}】，CD=3回合")
+    add_log(f"⚡ 【{p['name']}】装备【{status_card}】，持续3回合后可更换")
     
     if status_card in ["背水一战", "卧薪尝胆", "暗度陈仓"]:
         p['max_hp'] = 5
@@ -475,7 +487,6 @@ def execute_beishui_decision(idx, sacrifice):
     p['beishui_decided'] = True
     
     if sacrifice > 0:
-        # ✅ 问题1：5血可以扣4血，只要留1血就行
         sacrifice = min(sacrifice, p['hp'] - 1)
         p['hp'] -= sacrifice
         draw_count = sacrifice + 1
@@ -609,10 +620,15 @@ def on_play_card(data):
         
     card = data.get('card')
     tgt_idx = int(data.get('target', -1))
+    intent = data.get('intent')
 
     if card in ["防", "长城"]:
-        emit('action_error', {'msg': '🚨 被动牌！'})
-        return
+        # ✅ 修复4：自己回合，暗度陈仓可以把防当攻打
+        if p['status'] == "暗度陈仓" and card == "防" and intent == "攻":
+            pass  # 允许
+        else:
+            emit('action_error', {'msg': '🚨 被动牌只能防御时用！'})
+            return
 
     TARGET_CARDS = ["攻", "荆轲刺秦", "一字马", "顺手牵羊", "江山易主", "同归于尽"]
     if card in TARGET_CARDS and tgt_idx == -1:
@@ -624,6 +640,11 @@ def on_play_card(data):
     if game.actions_left <= 0:
         emit('action_error', {'msg': '🚨 没行动力了！'})
         return
+    
+    # ✅ 修复4：自己回合，暗度陈仓把防当攻打
+    if p['status'] == "暗度陈仓" and card == "防" and intent == "攻":
+        p['hand'].remove("防")
+        card = "攻"
 
     success = execute_play_card(p['idx'], card, tgt_idx)
     if success and not game.pending_action:
@@ -645,8 +666,9 @@ def on_equip_status(data):
     if card not in p['status_cards']:
         emit('action_error', {'msg': '🚨 没有这张牌！'})
         return
-    if p['status_cooldown'] > 0: 
-        emit('action_error', {'msg': f'🚨 CD还有{p["status_cooldown"]}回合！'})
+    # ✅ 修复3：CD>0才不能换，CD=0可以换
+    if p['status'] != "正常" and p['status_cooldown'] > 0: 
+        emit('action_error', {'msg': f'🚨 【{p["status"]}】还有{p["status_cooldown"]}回合CD！'})
         return
         
     p['status_cards'].remove(card)
@@ -677,9 +699,10 @@ def on_respond_action(data):
             add_log(f"✅ 防御成功！不掉血！")
             game.pending_action = None
     elif resp_type == '攻_as_防' and p['status'] == "暗度陈仓" and "攻" in p['hand']:
+        # ✅ 修复4：别人回合，暗度陈仓把攻当防打
         p['hand'].remove("攻")
         game.pending_action['required_defenses'] -= 1
-        add_log(f"🎭 以攻代防！")
+        add_log(f"🎭 【{p['name']}】暗度陈仓，以攻代防！")
         if game.pending_action['required_defenses'] <= 0:
             add_log(f"✅ 防御成功！")
             game.pending_action = None
