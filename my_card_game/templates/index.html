@@ -103,7 +103,7 @@
 <body>
 
     <header>
-        <h1><h1>三国kill · 官方精修核心场</h1></h1>
+        <h1>三国kill · 官方精修核心场</h1>
         <div id="game-meta" style="font-size: 13px; color: #cbd5e1;">大厅集结中...</div>
         <button class="btn" style="width:auto; padding:5px 12px; font-size:12px;" onclick="resetGame()">暴力重置房间</button>
     </header>
@@ -150,7 +150,14 @@
                     <div class="rules-text">▪ <b>【丁】(护卫)</b>：守护神。血量首次归零时<b>满血原地复活</b>（回至2体力并狂抽2张牌），并<b>向全场强制公开真实身份</b>！</div>
                 </div>
                 <div class="rules-section">
-                    <div class="rules-sub">二、核心基础卡牌数据库</div>
+                    <div class="rules-sub">二、行动力与回合规则</div>
+                    <div class="rules-text">▪ <b>第X轮 = X+1行动力</b>：第1轮2点，第2轮3点，以此类推</div>
+                    <div class="rules-text">▪ <b>3玩家 = 1轮</b>：3个玩家各出完牌为1轮，1个玩家出牌为1回合</div>
+                    <div class="rules-text">▪ <b>新一轮开始补牌</b>：每轮开始时所有玩家补牌至5张</div>
+                    <div class="rules-text">▪ <b>行动力耗尽强制结束</b>：行动力用完必须结束回合</div>
+                </div>
+                <div class="rules-section">
+                    <div class="rules-sub">三、核心基础卡牌数据库（共200张）</div>
                     <table class="table-desc">
                         <tr><th>牌名</th><th>类型</th><th>效果说明 (每次出牌耗1行动力)</th></tr>
                         <tr><td>攻</td><td>主动</td><td>对目标造成 1 点伤害，可被【防/长城】抵挡。</td></tr>
@@ -166,12 +173,12 @@
                     </table>
                 </div>
                 <div class="rules-section">
-                    <div class="rules-sub">三、状态卡牌觉醒词条</div>
-                    <div class="rules-text">每2个轮次结束时重置洗牌，冷却时间均为 3 回合。</div>
+                    <div class="rules-sub">四、状态卡牌觉醒词条</div>
+                    <div class="rules-text">每2个轮次结束时重置洗牌，冷却时间均为 3 回合（含装备回合）。</div>
                     <div class="rules-text">▪ <b>【背水一战】</b>：上限重置为5。轮到自己时可献祭 X 点血，暴抽 X+1 张。</div>
-                    <div class="rules-text">▪ <b>【饮鸩止渴】</b>：血量与上限瞬间撑爆至 10！但每3回合触发慢毒，上限减2，血强制回2。</div>
-                    <div class="rules-text">▪ <b>【卧薪尝胆】</b>：上限5。自带减伤（受攻伤害减1），但自己只要主动出牌就会受到执念反噬自残扣1血。</div>
-                    <div class="rules-text">▪ <b>【暗度陈仓】</b>：颠倒黑白。你允许将【攻】伪装成【防】防守，或将【防】当成【攻】打出！</div>
+                    <div class="rules-text">▪ <b>【饮鸩止渴】</b>：血量与上限瞬间撑爆至 10！但每3回合触发慢毒，上限减2。</div>
+                    <div class="rules-text">▪ <b>【卧薪尝胆】</b>：上限5。自带减伤（受攻伤害减1），但自己只要主动出牌就会受到执念反噬自残扣1血（最低1血不死）。</div>
+                    <div class="rules-text">▪ <b>【暗度陈仓】</b>：上限重置为5。出牌时可将【防】当【攻】打出；防守时可将【攻】当【防】使用。</div>
                 </div>
             </div>
         </div>
@@ -210,7 +217,6 @@
             socket.emit('reset_game');
         }
 
-        // 💥【核心硬伤完全修复】：将点击校验和状态捕获完美集成到纯粹的 JS 函数作用域内
         function selectTarget(idx) {
             if (idx === myIndex) {
                 alert("🚩 操作提示：不能锁定你自己哦！请点击其他玩家头像框进行对线锁定。");
@@ -319,7 +325,6 @@
                 for(let h=0; h<p.hp; h++) hpHearts += "❤️";
                 for(let m=p.hp; m<p.max_hp; m++) hpHearts += "🖤";
 
-                // 💥【核心修复】：去除 onclick 字符串里的不可用变量表达式，安全干净地传递 p.idx
                 anchor.innerHTML += `
                     <div class="${cardClass}" id="pcard-${p.idx}" onclick="selectTarget(${p.idx})">
                         <div class="p-header">
@@ -342,22 +347,15 @@
             const handAnchor = document.getElementById("basic-hand-anchor");
             handAnchor.innerHTML = "";
             data.my_cards.forEach(card => {
-                if (data.my_status === "暗度陈仓" && (card === "攻" || card === "防")) {
-                    if (card === "攻") {
-                        handAnchor.innerHTML += `
-                            <div style="display:flex; flex-direction:column; gap:2px;">
-                                <button class="card-item" onclick="playCard('攻')">攻 (原版)</button>
-                                <button class="card-item" style="background:#22a6b3;" onclick="playAnduxu('攻','防')">当【防】用</button>
-                            </div>
-                        `;
-                    } else {
-                        handAnchor.innerHTML += `
-                            <div style="display:flex; flex-direction:column; gap:2px;">
-                                <button class="card-item" style="background:#535c68;color:#ccc;" disabled>防 (待机)</button>
-                                <button class="card-item" style="background:#eb4d4b;" onclick="playAnduxu('防','攻')">当【攻】打</button>
-                            </div>
-                        `;
-                    }
+                if (data.my_status === "暗度陈仓" && card === "防") {
+                    handAnchor.innerHTML += `
+                        <div style="display:flex; flex-direction:column; gap:2px;">
+                            <button class="card-item" style="background:#535c68;color:#ccc;" disabled>防 (待机)</button>
+                            <button class="card-item" style="background:#eb4d4b;" onclick="playAnduxu('防','攻')">当【攻】打</button>
+                        </div>
+                    `;
+                } else if (data.my_status === "暗度陈仓" && card === "攻") {
+                    handAnchor.innerHTML += `<button class="card-item" onclick="playCard('攻')">攻</button>`;
                 } else {
                     if (["防", "长城"].includes(card)) {
                         handAnchor.innerHTML += `<button class="card-item" style="background:#535c68; color:#aaa; cursor:not-allowed;" title="被动防御卡，受到攻击时在屏幕中央弹出时才可点用" disabled>${card}</button>`;
