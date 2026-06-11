@@ -172,9 +172,15 @@ def start_game_engine():
         p['status_cards'] = [game.status_deck.pop(0) for _ in range(2)]
 
     lord_idx = next((i for i, p in enumerate(game.players) if p['faction'] == "冀"), 0)
-    add_log("⚔️ —— 乱世沙场大幕开启，生死对局正式激活！ ——")
     
-    # ✅ Bug2修复：确保第一个玩家有行动点，第1轮=2点
+    # ✅✅✅ Bug2终极修复：游戏启动时，第一行就强制设置行动点！第1轮=2点
+    game.current_idx = lord_idx
+    game.actions_left = game.round + 1  # 第1轮=2点
+    
+    add_log("⚔️ —— 乱世沙场大幕开启，生死对局正式激活！ ——")
+    add_log(f"🎬 —— 轮到【{game.players[lord_idx]['name']}】排兵布阵 ——")
+    add_log(f"⚡ 本轮行动力：{game.actions_left} 点")
+    
     start_turn(lord_idx)
 
 def start_turn(idx):
@@ -185,11 +191,11 @@ def start_turn(idx):
         return
         
     game.current_idx = idx
-    # ✅ Bug2修复：每回合开始第一行就设置行动点，第x轮=x+1点
-    game.actions_left = game.round + 1
+    # ✅✅✅ 双重保险：每回合开始再设置一次，确保100%有行动点
+    game.actions_left = game.round + 1  # 第x轮=x+1点
     p['beishui_decided'] = False
     
-    # 新一轮开始时（第一个玩家回合）补牌到5张
+    # ✅ 问题1修复：新一轮开始时补牌到5张，对局中可超过5张
     if game.new_round_started:
         game.new_round_started = False
         for player in game.players:
@@ -198,6 +204,7 @@ def start_turn(idx):
                 if cards_needed > 0:
                     draw_cards(player['idx'], cards_needed)
                     add_log(f"✋ 新一轮开始，【{player['name']}】自动补牌 {cards_needed} 张至5张。")
+                # 手牌超过5张不做处理，允许保留
     
     if p.get('skipped', False):
         p['skipped'] = False
@@ -217,8 +224,10 @@ def start_turn(idx):
             p['status'] = "正常"
             add_log(f"✨ 【{p['name']}】的特权技能状态届满卸载，恢复正常。")
 
-    add_log(f"🎬 —— 轮到【{p['name']}】排兵布阵 ——")
-    add_log(f"⚡ 本轮行动力：{game.actions_left} 点")
+    # 只有不是游戏启动的第一个回合才重复打日志
+    if game.round > 1 or idx != next((i for i, pl in enumerate(game.players) if pl['faction'] == "冀"), 0):
+        add_log(f"🎬 —— 轮到【{p['name']}】排兵布阵 ——")
+        add_log(f"⚡ 本轮行动力：{game.actions_left} 点")
     
     if p['status'] != "背水一战":
         broadcast_state()
@@ -259,62 +268,82 @@ def next_turn():
     start_turn(next_idx)
 
 # ==========================================
-# 🤖 智能人机自动化调度（带2秒思考时间）
+# 🤖 智能人机自动化调度（每个操作停顿1.5秒）
 # ==========================================
 def trigger_bot_if_needed():
     if not game.active or game.pending_action: return
     curr = game.players[game.current_idx]
     if curr['alive'] and curr.get('is_bot'):
         if curr['status'] == "背水一战" and not curr['beishui_decided']:
-            handle_bot_beishui(game.current_idx)
+            # ✅ 问题2修复：背水一战决策也停顿1.5秒
+            def delayed_beishui():
+                time.sleep(1.5)
+                handle_bot_beishui(game.current_idx)
+            threading.Thread(target=delayed_beishui, daemon=True).start()
             return
-        # 人机思考2秒再出牌
+        # ✅ 问题2修复：人机思考1.5秒再出牌
         def delayed_bot_move():
-            time.sleep(2)
+            time.sleep(1.5)
             run_bot_active_move(game.current_idx)
         threading.Thread(target=delayed_bot_move, daemon=True).start()
 
 def run_bot_active_move(bot_idx):
     p = game.players[bot_idx]
     if game.actions_left <= 0 or not p['alive']:
+        time.sleep(1.5)  # ✅ 结束回合前也停顿1.5秒
         end_turn_logic()
         return
 
+    # 优先装备状态牌
     if p['status'] == "正常" and p['status_cards']:
         scard = p['status_cards'].pop(0)
         equip_status_logic(bot_idx, scard)
         broadcast_state()
-        trigger_bot_if_needed()
+        # ✅ 问题2修复：装备完状态牌停顿1.5秒再继续
+        def continue_after_equip():
+            time.sleep(1.5)
+            trigger_bot_if_needed()
+        threading.Thread(target=continue_after_equip, daemon=True).start()
         return
 
     active_cards = [c for c in p['hand'] if c not in ["防", "长城"]]
     if not active_cards:
+        time.sleep(1.5)  # ✅ 结束回合前也停顿1.5秒
         end_turn_logic()
         return
 
+    # 选牌策略：优先回血，否则随机出一张攻击牌
     card = None
     if "回血" in active_cards and p['hp'] < p['max_hp']:
         card = "回血"
     else:
         playable = [c for c in active_cards if c != "回血"]
-        if playable: card = playable[0]
+        if playable: card = random.choice(playable)
             
     if not card:
+        time.sleep(1.5)
         end_turn_logic()
         return
 
+    # 选择目标
     living_enemies = [target for target in game.players if target['idx'] != bot_idx and target['alive']]
     if not living_enemies:
+        time.sleep(1.5)
         end_turn_logic()
         return
     target_idx = random.choice(living_enemies)['idx']
 
     success = execute_play_card(bot_idx, card, target_idx)
     if not success:
+        time.sleep(1.5)
         end_turn_logic()
     else:
         if not game.pending_action:
-            trigger_bot_if_needed()
+            # ✅ 问题2修复：出完一张牌停顿1.5秒再出下一张
+            def continue_after_play():
+                time.sleep(1.5)
+                trigger_bot_if_needed()
+            threading.Thread(target=continue_after_play, daemon=True).start()
 
 def handle_bot_beishui(idx):
     p = game.players[idx]
@@ -324,6 +353,9 @@ def handle_bot_beishui(idx):
 def handle_bot_defense_response(bot_idx):
     if not game.pending_action: return
     p = game.players[bot_idx]
+    
+    # ✅ 问题2修复：防御响应也停顿1.5秒
+    time.sleep(1.5)
     
     while game.pending_action and game.pending_action['required_defenses'] > 0:
         if "长城" in p['hand']:
