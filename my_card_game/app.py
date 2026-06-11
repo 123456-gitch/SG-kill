@@ -158,7 +158,7 @@ def start_game_engine():
         p['hp'] = 5
         p['faction_revealed'] = False
         p['hand'] = [game.deck.pop(0) for _ in range(5)]
-        p['status_cards'] = [game.status_deck.pop(0) for _ in range(2)]
+        p['status_cards'] = []
 
     first_idx = random.randint(0, 2)
     game.current_idx = first_idx
@@ -180,6 +180,11 @@ def start_turn(idx):
     game.current_idx = idx
     game.actions_left = game.round + 1
     p['beishui_decided'] = False
+    
+    # ✅ 新增：每回合开始刷新2张不重复的状态牌（无限获取）
+    all_status = list(STATUS_CARDS)
+    random.shuffle(all_status)
+    p['status_cards'] = all_status[:2]
     
     if p['status'] == "饮鸩止渴":
         p['max_hp'] = max(1, p['max_hp'] - 3)
@@ -207,7 +212,7 @@ def end_turn_logic():
     if not game.active: return
     add_log(f"🏁 【{game.players[game.current_idx]['name']}】结束回合")
     
-    # ✅ 修复：每结束一个回合，所有有状态的玩家CD-1，3回合=1轮到期
+    # 每结束一个回合，所有有状态的玩家CD-1
     for p in game.players:
         if p['alive'] and p['status_cooldown'] > 0:
             p['status_cooldown'] -= 1
