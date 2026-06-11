@@ -158,7 +158,10 @@ def start_game_engine():
         p['hp'] = 5
         p['faction_revealed'] = False
         p['hand'] = [game.deck.pop(0) for _ in range(5)]
-        p['status_cards'] = []
+        # ✅ 修改3：开局每人刷新2张不重复状态牌
+        all_status = list(STATUS_CARDS)
+        random.shuffle(all_status)
+        p['status_cards'] = all_status[:2]
 
     first_idx = random.randint(0, 2)
     game.current_idx = first_idx
@@ -181,7 +184,7 @@ def start_turn(idx):
     game.actions_left = game.round + 1
     p['beishui_decided'] = False
     
-    # ✅ 新增：每回合开始刷新2张不重复的状态牌（无限获取）
+    # 每回合开始刷新2张不重复状态牌
     all_status = list(STATUS_CARDS)
     random.shuffle(all_status)
     p['status_cards'] = all_status[:2]
@@ -340,21 +343,24 @@ def handle_bot_defense_response(bot_idx):
     p = game.players[bot_idx]
     time.sleep(1.5)
     
+    # ✅ 问题2确认：长城1张直接废掉整次攻击
+    if "长城" in p['hand']:
+        p['hand'].remove("长城")
+        add_log(f"🧱 机器人【长城】格挡整张牌！")
+        game.pending_action = None
+        check_victory_conditions()
+        broadcast_state()
+        return
+    
     while game.pending_action and game.pending_action['required_defenses'] > 0:
-        if "长城" in p['hand']:
-            p['hand'].remove("长城")
-            add_log(f"🧱 机器人【长城】格挡！")
-            game.pending_action = None
-            break
-            
-        if "防" in p['hand'] and game.pending_action['card'] in ["攻", "荆轲刺秦"]:
+        if "防" in p['hand']:
             p['hand'].remove("防")
             game.pending_action['required_defenses'] -= 1
             add_log(f"🛡️ 机器人【防】")
             if game.pending_action['required_defenses'] <= 0:
                 add_log(f"✅ 机器人防御成功！")
                 game.pending_action = None
-        elif p['status'] == "暗度陈仓" and "攻" in p['hand'] and game.pending_action['card'] in ["攻", "荆轲刺秦"]:
+        elif p['status'] == "暗度陈仓" and "攻" in p['hand']:
             p['hand'].remove("攻")
             game.pending_action['required_defenses'] -= 1
             add_log(f"🎭 机器人【暗度陈仓】以攻代防！")
@@ -428,13 +434,6 @@ def set_attack_pipeline(src_idx, tgt_idx, card, count):
     }
     
     if tgt.get('is_bot'):
-        if "长城" in tgt['hand']:
-            time.sleep(1.5)
-            tgt['hand'].remove("长城")
-            add_log(f"🧱 机器人【长城】格挡【{card}】！")
-            game.pending_action = None
-            broadcast_state()
-            return
         handle_bot_defense_response(tgt_idx)
 
 def execute_card_effect(src_idx, tgt_idx, card):
@@ -523,6 +522,10 @@ def damage_player(idx, amount, reason=""):
         p['hand'] = []
         p['status_cards'] = []
         p['status'] = "正常"
+        # ✅ 修改1：自己回合内阵亡，立刻移交出牌权
+        if idx == game.current_idx:
+            add_log(f"⏭️ 【{p['name']}】在自己回合阵亡，出牌权移交下一位")
+            end_turn_logic()
 
 def check_victory_conditions():
     if not game.active: return
@@ -615,7 +618,7 @@ def on_play_card(data):
     if not p: return
 
     if game.pending_action:
-        emit('action_error', {'msg': '🚨 结算中！'})
+        emit('action_error', {'msg': '🚨 结算中！请先处理防御响应'})
         return
     if game.current_idx != p['idx']: 
         emit('action_error', {'msg': '🚨 不是你的回合！'})
@@ -629,15 +632,15 @@ def on_play_card(data):
         if p['status'] == "暗度陈仓" and card == "防" and intent == "攻":
             pass
         else:
-            emit('action_error', {'msg': '🚨 被动牌只能防御时用！'})
+            emit('action_error', {'msg': '🚨 被动牌只能在被攻击时使用！'})
             return
 
     TARGET_CARDS = ["攻", "荆轲刺秦", "一字马", "顺手牵羊", "江山易主", "同归于尽"]
     if card in TARGET_CARDS and tgt_idx == -1:
-        emit('action_error', {'msg': '🚨 选目标！'})
+        emit('action_error', {'msg': '🚨 请先选择目标玩家！'})
         return
     if tgt_idx != -1 and not game.players[tgt_idx]['alive']:
-        emit('action_error', {'msg': '🚨 目标阵亡！'})
+        emit('action_error', {'msg': '🚨 目标已阵亡！'})
         return
     if game.actions_left <= 0:
         emit('action_error', {'msg': '🚨 没行动力了！'})
@@ -646,6 +649,7 @@ def on_play_card(data):
     if p['status'] == "暗度陈仓" and card == "防" and intent == "攻":
         p['hand'].remove("防")
         card = "攻"
+        add_log(f"🎭 【{p['name']}】暗度陈仓，以防为攻！")
 
     success = execute_play_card(p['idx'], card, tgt_idx)
     if success and not game.pending_action:
@@ -660,12 +664,12 @@ def on_equip_status(data):
         emit('action_error', {'msg': '🚨 结算中！'})
         return
     if game.current_idx != p['idx']: 
-        emit('action_error', {'msg': '🚨 不是你的回合！'})
+        emit('action_error', {'msg': '🚨 只能在自己回合装备状态牌！'})
         return
     
     card = data.get('card')
     if card not in p['status_cards']:
-        emit('action_error', {'msg': '🚨 没有这张牌！'})
+        emit('action_error', {'msg': '🚨 没有这张状态牌！'})
         return
     if p['status'] != "正常" and p['status_cooldown'] > 0: 
         emit('action_error', {'msg': f'🚨 【{p["status"]}】还有{p["status_cooldown"]}回合CD！'})
@@ -687,9 +691,10 @@ def on_respond_action(data):
     src_idx = game.pending_action['source_idx']
     tgt_idx = game.pending_action['target_idx']
     
+    # ✅ 问题2：长城一张直接废掉整次攻击
     if resp_type == '长城' and "长城" in p['hand']:
         p['hand'].remove("长城")
-        add_log(f"🧱 【{p['name']}】【长城】格挡【{card_name}】！")
+        add_log(f"🧱 【{p['name']}】【长城】格挡整张【{card_name}】！")
         game.pending_action = None
     elif resp_type == '防' and "防" in p['hand']:
         p['hand'].remove("防")
