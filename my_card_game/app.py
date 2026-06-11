@@ -90,8 +90,11 @@ def broadcast_state():
         client_players = []
         
         for p in game.players:
+            # ✅ Bug1修复：只有自己能看到自己的身份，其他人全部隐藏，死亡后才公开
             visible_faction = "隐藏"
-            if p['idx'] == human_idx or p['faction_revealed'] or not p['alive']:
+            if p['idx'] == human_idx:  # 只有自己能看到自己的身份
+                visible_faction = p['faction']
+            elif not p['alive']:  # 死亡后公开身份
                 visible_faction = p['faction']
                 
             client_players.append({
@@ -162,7 +165,8 @@ def start_game_engine():
         p['max_hp'] = 5
         p['hp'] = 5
         
-        p['faction_revealed'] = (p['faction'] == "冀")
+        # ✅ Bug1修复：冀的身份也默认隐藏，只有自己能看到
+        p['faction_revealed'] = False
             
         p['hand'] = [game.deck.pop(0) for _ in range(5)]
         p['status_cards'] = [game.status_deck.pop(0) for _ in range(2)]
@@ -170,8 +174,7 @@ def start_game_engine():
     lord_idx = next((i for i, p in enumerate(game.players) if p['faction'] == "冀"), 0)
     add_log("⚔️ —— 乱世沙场大幕开启，生死对局正式激活！ ——")
     
-    # ✅ 【关键修复】游戏启动时直接初始化第一个玩家行动点
-    game.actions_left = game.round + 1
+    # ✅ Bug2修复：确保第一个玩家有行动点，第1轮=2点
     start_turn(lord_idx)
 
 def start_turn(idx):
@@ -182,7 +185,7 @@ def start_turn(idx):
         return
         
     game.current_idx = idx
-    # ✅ 【关键修复】每个回合开始第一行就设置行动点，确保不遗漏
+    # ✅ Bug2修复：每回合开始第一行就设置行动点，第x轮=x+1点
     game.actions_left = game.round + 1
     p['beishui_decided'] = False
     
