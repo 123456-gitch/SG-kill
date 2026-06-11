@@ -145,9 +145,9 @@
                 <div class="rules-title">📜 游戏机制与全卡牌规则图鉴</div>
                 <div class="rules-section">
                     <div class="rules-sub">一、阵营与终极胜负法则</div>
-                    <div class="rules-text">▪ <b>【司】(叛逆者)</b>：独立作战，胜利条件为：<b>击杀【冀】</b>。</div>
-                    <div class="rules-text">▪ <b>【冀】(主星)</b>：与丁同盟，胜利条件为：<b>联合击杀【司】</b>。</div>
-                    <div class="rules-text">▪ <b>【丁】(护卫)</b>：守护神。血量首次归零时<b>原地复活</b>（回至2体力并抽2张牌），并<b>向全场强制公开真实身份</b>！</div>
+                    <div class="rules-text">▪ <b>【司】</b>：独立作战，胜利条件为：<b>击杀【冀】</b>。</div>
+                    <div class="rules-text">▪ <b>【冀】</b>：与丁同盟，胜利条件为：<b>联合击杀【司】</b>。</div>
+                    <div class="rules-text">▪ <b>【丁】</b>：左右护法。血量首次归零时<b>原地复活</b>（回至2体力并抽2张牌），并<b>向全场强制公开真实身份</b>！</div>
                 </div>
                 <div class="rules-section">
                     <div class="rules-sub">二、行动力与回合规则</div>
@@ -394,7 +394,7 @@
                 if (data.my_cards.includes("长城")) {
                     btnsHtml += `<button class="btn-action" style="background:#4834d4;" onclick="respond('长城')">祭出【长城壁】</button>`;
                 }
-                btnsHtml += `<button class="btn-action" style="background:#eb4d4b;" onclick="respond('放弃')">放弃抵抗(承担扣血效果)</button>`;
+                btnsHtml += `<button class="btn-action" style="background:#eb4d4b;" onclick="respond('放弃')">放弃抵抗</button>`;
 
                 promptAnchor.innerHTML = `
                     <div class="prompt-panel">
