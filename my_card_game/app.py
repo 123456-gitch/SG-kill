@@ -76,7 +76,6 @@ def broadcast_lobby():
 
 def broadcast_state():
     if not game.active: return
-    add_log(f"📡 广播时行动点：{game.actions_left}")  # 调试日志
     
     for human_player in game.players:
         if human_player.get('is_bot'): continue
@@ -135,7 +134,7 @@ def get_player_by_sid(sid):
     return next((p for p in game.players if p.get('sid') == sid), None)
 
 # ==========================================
-# 🎮 核心战斗引擎
+# 🎮 核心战斗引擎 - 彻底重写！
 # ==========================================
 def start_game_engine():
     game.active = True
@@ -161,18 +160,21 @@ def start_game_engine():
         p['hand'] = [game.deck.pop(0) for _ in range(5)]
         p['status_cards'] = [game.status_deck.pop(0) for _ in range(2)]
 
-    # ✅✅✅ 行动点终极修复：写死！广播前、广播后、广播中都强制=2！
-    first_idx = random.randint(0, len(game.players) - 1)
+    # ✅✅✅ 真正随机！3个玩家完全随机选第一个出牌的！
+    first_idx = random.randint(0, 2)  # 0、1、2 完全随机！
     game.current_idx = first_idx
-    game.actions_left = 2  # 强制写死第一个出牌的=2点
+    game.actions_left = 2  # ✅✅✅ 强制=2！
     
     add_log("⚔️ —— 游戏开始！ ——")
+    add_log(f"🎲 随机选中【{game.players[first_idx]['name']}】作为第一个出牌的玩家！")
     add_log(f"🎬 轮到【{game.players[first_idx]['name']}】出牌")
-    add_log(f"⚡ 行动点：{game.actions_left}")
+    add_log(f"⚡ 行动点强制设置为：{game.actions_left}")
     
-    game.actions_left = 2  # 广播前再强制
+    # ✅✅✅ 广播前、广播中、广播后 三次强制设置！
+    game.actions_left = 2
     broadcast_state()
-    game.actions_left = 2  # 广播后再强制
+    game.actions_left = 2
+    
     trigger_bot_if_needed()
 
 def start_turn(idx):
@@ -183,21 +185,15 @@ def start_turn(idx):
         return
         
     game.current_idx = idx
-    # ✅✅✅ 行动点终极修复：每回合开始第一行就写死！
-    game.actions_left = game.round + 1
-    add_log(f"⚡ 设置行动点：{game.actions_left}")
-    
+    game.actions_left = game.round + 1  # ✅✅✅ 强制设置！
     p['beishui_decided'] = False
     
-    # ✅ 状态牌CD：从装备开始算3个自己的回合
     if p['status_cooldown'] > 0:
         p['status_cooldown'] -= 1
-        add_log(f"⏱️ 【{p['name']}】状态CD：{p['status_cooldown']}")
         if p['status_cooldown'] == 0:
             add_log(f"✨ 【{p['name']}】的【{p['status']}】结束，可以换新状态！")
             p['status'] = "正常"
     
-    # ✅✅✅ 饮鸩止渴：每回合（自己的回合）都减3上限！
     if p['status'] == "饮鸩止渴":
         p['max_hp'] = max(1, p['max_hp'] - 3)
         force_hp_limit(p)
@@ -212,9 +208,9 @@ def start_turn(idx):
     add_log(f"🎬 —— 【{p['name']}】的回合 ——")
     add_log(f"⚡ 行动力：{game.actions_left}")
     
-    game.actions_left = game.round + 1  # 广播前再强制
+    game.actions_left = game.round + 1  # ✅✅✅ 广播前再强制
     broadcast_state()
-    game.actions_left = game.round + 1  # 广播后再强制
+    game.actions_left = game.round + 1  # ✅✅✅ 广播后再强制
     
     if p['status'] != "背水一战":
         trigger_bot_if_needed()
@@ -276,8 +272,6 @@ def trigger_bot_if_needed():
 
 def run_bot_active_move(bot_idx):
     p = game.players[bot_idx]
-    add_log(f"🤖 机器人行动，当前行动点：{game.actions_left}")
-    
     if game.actions_left <= 0 or not p['alive']:
         time.sleep(1.5)
         end_turn_logic()
@@ -374,10 +368,8 @@ def execute_play_card(src_idx, card, tgt_idx):
     if game.actions_left <= 0 or card not in src['hand']: return False
 
     game.actions_left -= 1
-    add_log(f"⚡ 出牌后行动点：{game.actions_left}")
     src['hand'].remove(card)
 
-    # ✅✅✅ 卧薪尝胆：打回血不扣血！
     if src['status'] == "卧薪尝胆" and card != "回血":
         src['hp'] = max(1, src['hp'] - 1)
         add_log(f"🔥 卧薪尝胆反噬-1血")
@@ -455,7 +447,7 @@ def execute_card_effect(src_idx, tgt_idx, card):
 def equip_status_logic(idx, status_card):
     p = game.players[idx]
     p['status'] = status_card
-    p['status_cooldown'] = 3  # ✅ 从装备开始算3个自己的回合
+    p['status_cooldown'] = 3
     add_log(f"⚡ 【{p['name']}】装备【{status_card}】，CD=3回合")
     
     if status_card in ["背水一战", "卧薪尝胆", "暗度陈仓"]:
