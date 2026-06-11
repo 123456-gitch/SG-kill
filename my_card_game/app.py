@@ -1,5 +1,6 @@
 import random
 import time
+import threading
 from flask import Flask, render_template, request
 from flask_socketio import SocketIO, emit
 
@@ -8,12 +9,12 @@ app.config['SECRET_KEY'] = 'sg_ultimate_match_2026_fixed'
 socketio = SocketIO(app, cors_allowed_origins="*")
 
 # ==========================================
-# 🃏 全量卡牌池数据中心
+# 🃏 全量卡牌池数据中心 (共200张)
 # ==========================================
 BASIC_CARDS = (
-    ["攻"] * 15 + ["防"] * 10 + ["长城"] * 4 + ["回血"] * 6 + 
-    ["卡牌大师"] * 4 + ["荆轲刺秦"] * 3 + ["一字马"] * 3 + 
-    ["顺手牵羊"] * 4 + ["江山易主"] * 2 + ["同归于尽"] * 3
+    ["攻"] * 55 + ["防"] * 45 + ["长城"] * 15 + ["回血"] * 20 + 
+    ["卡牌大师"] * 15 + ["荆轲刺秦"] * 12 + ["一字马"] * 10 + 
+    ["顺手牵羊"] * 12 + ["江山易主"] * 6 + ["同归于尽"] * 10
 )
 STATUS_CARDS = ["背水一战", "饮鸩止渴", "卧薪尝胆", "暗度陈仓"]
 
@@ -32,6 +33,7 @@ class GameEngine:
         self.status_deck = []
         self.pending_action = None
         self.logs = []
+        self.new_round_started = False
 
 game = GameEngine()
 
@@ -141,6 +143,7 @@ def get_player_by_sid(sid):
 def start_game_engine():
     game.active = True
     game.round = 1
+    game.new_round_started = True
     game.logs = []
     rebuild_decks()
     
@@ -156,14 +159,12 @@ def start_game_engine():
         p['skipped'] = False
         p['has_revived'] = False
         
-        # 统一血量上线和基础血量为 5
         p['max_hp'] = 5
         p['hp'] = 5
         
-        # 冀的阵营开局明牌
         p['faction_revealed'] = (p['faction'] == "冀")
             
-        p['hand'] = [game.deck.pop(0) for _ in range(5)] # 开局直接发5张
+        p['hand'] = [game.deck.pop(0) for _ in range(5)]
         p['status_cards'] = [game.status_deck.pop(0) for _ in range(2)]
 
     lord_idx = next((i for i, p in enumerate(game.players) if p['faction'] == "冀"), 0)
@@ -179,8 +180,18 @@ def start_turn(idx):
         return
         
     game.current_idx = idx
-    game.actions_left = 2  # 核心行动力
+    game.actions_left = game.round + 1
     p['beishui_decided'] = False
+    
+    # 新一轮开始时（第一个玩家回合）补牌到5张
+    if game.new_round_started:
+        game.new_round_started = False
+        for player in game.players:
+            if player['alive'] and player['status'] != "背水一战":
+                cards_needed = 5 - len(player['hand'])
+                if cards_needed > 0:
+                    draw_cards(player['idx'], cards_needed)
+                    add_log(f"✋ 新一轮开始，【{player['name']}】自动补牌 {cards_needed} 张至5张。")
     
     if p.get('skipped', False):
         p['skipped'] = False
@@ -192,9 +203,7 @@ def start_turn(idx):
         p['status_cooldown'] -= 1
         if p['status_cooldown'] <= 0:
             p['max_hp'] = max(1, p['max_hp'] - 2)
-            p['hp'] += 2
-            force_hp_limit(p)
-            add_log(f"🧪 【{p['name']}】饮鸩止渴毒发！最大生命永久扣减2，强行回血至 {p['hp']}。")
+            add_log(f"🧪 【{p['name']}】饮鸩止渴毒发！最大生命永久扣减2。")
             p['status_cooldown'] = 3 
     elif p['status_cooldown'] > 0:
         p['status_cooldown'] -= 1
@@ -203,19 +212,12 @@ def start_turn(idx):
             add_log(f"✨ 【{p['name']}】的特权技能状态届满卸载，恢复正常。")
 
     add_log(f"🎬 —— 轮到【{p['name']}】排兵布阵 ——")
+    add_log(f"⚡ 本轮行动力：{game.actions_left} 点")
     
-    # 补齐手牌逻辑：如果不足5张，补齐到5张
     if p['status'] != "背水一战":
-        cards_needed = 5 - len(p['hand'])
-        if cards_needed > 0:
-            draw_cards(idx, cards_needed)
-            add_log(f"✋ 【{p['name']}】回合初自动补牌 {cards_needed} 张。")
-        else:
-            add_log(f"✋ 【{p['name']}】手牌充裕（≥5张），本回合跳过补牌。")
         broadcast_state()
         trigger_bot_if_needed()
     else:
-        # 如果是背水一战，则先弹窗等待决策，不执行常规补牌
         if p.get('is_bot'):
             handle_bot_beishui(idx)
         else:
@@ -240,6 +242,8 @@ def next_turn():
     
     if next_idx == 0:
         game.round += 1
+        game.new_round_started = True
+        add_log(f"📢 ====== 第 {game.round} 轮开始 ======")
         if game.round % 2 == 1:
             rebuild_decks()
             add_log("🤹 [时空流转] 战局推进两轮，核心弃牌堆重新洗牌！")
@@ -247,7 +251,7 @@ def next_turn():
     start_turn(next_idx)
 
 # ==========================================
-# 🤖 智能人机自动化调度
+# 🤖 智能人机自动化调度（带2秒思考时间）
 # ==========================================
 def trigger_bot_if_needed():
     if not game.active or game.pending_action: return
@@ -256,7 +260,11 @@ def trigger_bot_if_needed():
         if curr['status'] == "背水一战" and not curr['beishui_decided']:
             handle_bot_beishui(game.current_idx)
             return
-        run_bot_active_move(game.current_idx)
+        # 人机思考2秒再出牌
+        def delayed_bot_move():
+            time.sleep(2)
+            run_bot_active_move(game.current_idx)
+        threading.Thread(target=delayed_bot_move, daemon=True).start()
 
 def run_bot_active_move(bot_idx):
     p = game.players[bot_idx]
@@ -264,7 +272,6 @@ def run_bot_active_move(bot_idx):
         end_turn_logic()
         return
 
-    # 人机自动装配状态牌（现在不耗费行动力，直接连动）
     if p['status'] == "正常" and p['status_cards']:
         scard = p['status_cards'].pop(0)
         equip_status_logic(bot_idx, scard)
@@ -347,16 +354,19 @@ def execute_play_card(src_idx, card, tgt_idx):
     src = game.players[src_idx]
     tgt = game.players[tgt_idx] if tgt_idx != -1 else None
 
-    # 这个检查已作为后备，主报错拦截在 Socket API 层
     if game.actions_left <= 0 or card not in src['hand']: return False
 
     game.actions_left -= 1
     src['hand'].remove(card)
 
     if src['status'] == "卧薪尝胆":
-        damage_player(src_idx, 1, reason="卧薪尝胆出牌反噬")
+        src['hp'] = max(1, src['hp'] - 1)
+        add_log(f"🔥 【{src['name']}】卧薪尝胆执念反噬，自损1血！")
 
-    add_log(f"🃏 【{src['name']}】消耗行动力，打出 【{card}】" + (f" ➡️ 目标直指 【{tgt['name']}】" if tgt else ""))
+    if card in ["回血", "卡牌大师"]:
+        add_log(f"🃏 【{src['name']}】消耗行动力，打出 【{card}】")
+    else:
+        add_log(f"🃏 【{src['name']}】消耗行动力，打出 【{card}】" + (f" ➡️ 目标直指 【{tgt['name']}】" if tgt else ""))
 
     if card == "回血":
         src['hp'] += 1
@@ -383,6 +393,12 @@ def execute_play_card(src_idx, card, tgt_idx):
         damage_player(src_idx, 1, reason="同归于尽")
         damage_player(tgt_idx, 1, reason="同归于尽")
     
+    # 行动力耗尽强制结束回合
+    if game.actions_left <= 0:
+        add_log(f"⚠️ 【{src['name']}】行动力已耗尽，强制结束回合！")
+        end_turn_logic()
+        return True
+    
     check_victory_conditions()
     broadcast_state()
     return True
@@ -408,15 +424,12 @@ def equip_status_logic(idx, status_card):
     p['status'] = status_card
     add_log(f"⚡ 【{p['name']}】不消耗行动力，直接装备了状态：【{status_card}】！")
     
-    # 无论切什么状态，必须强制检查血量不得超出当前的Max HP界限
-    if status_card in ["背水一战", "卧薪尝胆"]:
+    if status_card in ["背水一战", "卧薪尝胆", "暗度陈仓"]:
         p['max_hp'] = 5
         p['status_cooldown'] = 3
     elif status_card == "饮鸩止渴":
         p['max_hp'] = 10
         p['hp'] = 10
-        p['status_cooldown'] = 3
-    elif status_card == "暗度陈仓":
         p['status_cooldown'] = 3
         
     force_hp_limit(p)
@@ -432,7 +445,6 @@ def execute_beishui_decision(idx, sacrifice):
         add_log(f"🩸 【{p['name']}】触发背水一战：自损 {sacrifice} 血量，补 {draw_count} 张牌！")
         draw_cards(idx, draw_count)
     else:
-        # 即使放弃背水一战，回合初也要保证手牌数补到 5 张的基线
         cards_needed = 5 - len(p['hand'])
         if cards_needed > 0:
             add_log(f"🛡️ 【{p['name']}】放弃献祭，回归回合常规补牌 {cards_needed} 张。")
@@ -568,12 +580,10 @@ def on_play_card(data):
     p = get_player_by_sid(request.sid)
     if not p: return
 
-    # 违规：场上有人正在结算防御响应，此时必须等待
     if game.pending_action:
         emit('action_error', {'msg': '🚨 刀剑无眼！场上正在处理攻击结算，请稍安勿躁。'})
         return
 
-    # 违规：不是你的回合
     if game.current_idx != p['idx']: 
         emit('action_error', {'msg': '🚨 别急着抢戏！当前并不是你的回合。'})
         return
@@ -582,23 +592,20 @@ def on_play_card(data):
     tgt_idx = int(data.get('target', -1))
     intent = data.get('intent') 
 
-    # 违规：想要主动打出防御牌（除了暗度陈仓做伪装）
-    if card in ["防", "长城"] and not (p['status'] == "暗度陈仓" and intent == "攻" and "防" in p['hand']):
+    if card in ["防", "长城"] and not (p['status'] == "暗度陈仓" and intent == "攻" and card == "防"):
         emit('action_error', {'msg': f'🚨 【{card}】是被动自卫牌，只能在遭到攻击时弹窗打出！'})
         return
 
-    # 违规：需要选目标的牌却没选目标
     TARGET_CARDS = ["攻", "荆轲刺秦", "一字马", "顺手牵羊", "江山易主", "同归于尽"]
     if card in TARGET_CARDS and tgt_idx == -1:
         emit('action_error', {'msg': f'🚨 打出【{card}】必须先在场上选定一个存活目标！'})
         return
         
-    # 违规：想选死人当目标，或者没行动力了
     if tgt_idx != -1 and not game.players[tgt_idx]['alive']:
         emit('action_error', {'msg': '🚨 逝者安息吧！目标已经阵亡，无法选中。'})
         return
     if game.actions_left <= 0:
-        emit('action_error', {'msg': '🚨 行动力已耗尽（0/2）！无法再出牌，请点击【结束回合】。'})
+        emit('action_error', {'msg': '🚨 行动力已耗尽！无法再出牌，请结束回合。'})
         return
     
     if p['status'] == "暗度陈仓" and intent == "攻" and card == "防":
@@ -617,7 +624,6 @@ def on_equip_status(data):
     p = get_player_by_sid(request.sid)
     if not p: return
 
-    # 违规防呆拦截
     if game.pending_action:
         emit('action_error', {'msg': '🚨 战斗结算中，不可装备状态牌！'})
         return
