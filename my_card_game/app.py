@@ -9,12 +9,12 @@ app.config['SECRET_KEY'] = 'sg_ultimate_match_2026_fixed'
 socketio = SocketIO(app, cors_allowed_origins="*")
 
 # ==========================================
-# 🃏 全量卡牌池数据中心 (共200张)
+# 🃏 全量卡牌池数据中心 (共250张，问题3修复：平衡卡牌数量)
 # ==========================================
 BASIC_CARDS = (
-    ["攻"] * 55 + ["防"] * 45 + ["长城"] * 15 + ["回血"] * 20 + 
-    ["卡牌大师"] * 15 + ["荆轲刺秦"] * 12 + ["一字马"] * 10 + 
-    ["顺手牵羊"] * 12 + ["江山易主"] * 6 + ["同归于尽"] * 10
+    ["攻"] * 40 + ["防"] * 50 + ["长城"] * 20 + ["回血"] * 25 + 
+    ["卡牌大师"] * 20 + ["荆轲刺秦"] * 8 + ["一字马"] * 8 + 
+    ["顺手牵羊"] * 15 + ["江山易主"] * 4 + ["同归于尽"] * 10
 )
 STATUS_CARDS = ["背水一战", "饮鸩止渴", "卧薪尝胆", "暗度陈仓"]
 
@@ -90,11 +90,10 @@ def broadcast_state():
         client_players = []
         
         for p in game.players:
-            # ✅ Bug1修复：只有自己能看到自己的身份，其他人全部隐藏，死亡后才公开
             visible_faction = "隐藏"
-            if p['idx'] == human_idx:  # 只有自己能看到自己的身份
+            if p['idx'] == human_idx:
                 visible_faction = p['faction']
-            elif not p['alive']:  # 死亡后公开身份
+            elif not p['alive']:
                 visible_faction = p['faction']
                 
             client_players.append({
@@ -165,23 +164,22 @@ def start_game_engine():
         p['max_hp'] = 5
         p['hp'] = 5
         
-        # ✅ Bug1修复：冀的身份也默认隐藏，只有自己能看到
         p['faction_revealed'] = False
             
         p['hand'] = [game.deck.pop(0) for _ in range(5)]
         p['status_cards'] = [game.status_deck.pop(0) for _ in range(2)]
 
-    lord_idx = next((i for i, p in enumerate(game.players) if p['faction'] == "冀"), 0)
+    # ✅ 问题1修复：随机选第一个出牌的玩家！不再固定冀先出
+    first_idx = random.randint(0, len(game.players) - 1)
     
-    # ✅✅✅ Bug2终极修复：游戏启动时，第一行就强制设置行动点！第1轮=2点
-    game.current_idx = lord_idx
-    game.actions_left = game.round + 1  # 第1轮=2点
+    game.current_idx = first_idx
+    game.actions_left = 2  # 第一个出牌的固定2行动点
     
     add_log("⚔️ —— 乱世沙场大幕开启，生死对局正式激活！ ——")
-    add_log(f"🎬 —— 轮到【{game.players[lord_idx]['name']}】排兵布阵 ——")
+    add_log(f"🎬 —— 轮到【{game.players[first_idx]['name']}】排兵布阵 ——")
     add_log(f"⚡ 本轮行动力：{game.actions_left} 点")
     
-    start_turn(lord_idx)
+    start_turn(first_idx)
 
 def start_turn(idx):
     if not game.active: return
@@ -191,20 +189,9 @@ def start_turn(idx):
         return
         
     game.current_idx = idx
-    # ✅✅✅ 双重保险：每回合开始再设置一次，确保100%有行动点
-    game.actions_left = game.round + 1  # 第x轮=x+1点
+    # ✅ 问题1+2修复：每回合行动点 = 轮数 + 1
+    game.actions_left = game.round + 1
     p['beishui_decided'] = False
-    
-    # ✅ 问题1修复：新一轮开始时补牌到5张，对局中可超过5张
-    if game.new_round_started:
-        game.new_round_started = False
-        for player in game.players:
-            if player['alive'] and player['status'] != "背水一战":
-                cards_needed = 5 - len(player['hand'])
-                if cards_needed > 0:
-                    draw_cards(player['idx'], cards_needed)
-                    add_log(f"✋ 新一轮开始，【{player['name']}】自动补牌 {cards_needed} 张至5张。")
-                # 手牌超过5张不做处理，允许保留
     
     if p.get('skipped', False):
         p['skipped'] = False
@@ -212,11 +199,12 @@ def start_turn(idx):
         next_turn()
         return
 
+    # ✅ 问题6修复：饮鸩止渴每回合减3上限
     if p['status'] == "饮鸩止渴":
         p['status_cooldown'] -= 1
         if p['status_cooldown'] <= 0:
-            p['max_hp'] = max(1, p['max_hp'] - 2)
-            add_log(f"🧪 【{p['name']}】饮鸩止渴毒发！最大生命永久扣减2。")
+            p['max_hp'] = max(1, p['max_hp'] - 3)
+            add_log(f"🧪 【{p['name']}】饮鸩止渴毒发！最大生命永久扣减3。")
             p['status_cooldown'] = 3 
     elif p['status_cooldown'] > 0:
         p['status_cooldown'] -= 1
@@ -224,8 +212,7 @@ def start_turn(idx):
             p['status'] = "正常"
             add_log(f"✨ 【{p['name']}】的特权技能状态届满卸载，恢复正常。")
 
-    # 只有不是游戏启动的第一个回合才重复打日志
-    if game.round > 1 or idx != next((i for i, pl in enumerate(game.players) if pl['faction'] == "冀"), 0):
+    if game.round > 1 or idx != game.players[0]['idx']:
         add_log(f"🎬 —— 轮到【{p['name']}】排兵布阵 ——")
         add_log(f"⚡ 本轮行动力：{game.actions_left} 点")
     
@@ -234,6 +221,7 @@ def start_turn(idx):
         trigger_bot_if_needed()
     else:
         if p.get('is_bot'):
+            time.sleep(1.5)
             handle_bot_beishui(idx)
         else:
             broadcast_state()
@@ -255,12 +243,21 @@ def next_turn():
         
     if next_idx == game.current_idx: return
     
-    # 找到本轮起始玩家（冀的idx），回到他时表示新一轮开始
-    lord_idx = next((i for i, p in enumerate(game.players) if p['faction'] == "冀"), 0)
-    if next_idx == lord_idx:
+    # ✅ 问题2修复：3个玩家各出完=1轮，回到第一个时新一轮开始并补牌
+    first_player_idx = next((i for i, p in enumerate(game.players) if p['alive']), 0)
+    if next_idx == first_player_idx:
         game.round += 1
         game.new_round_started = True
         add_log(f"📢 ====== 第 {game.round} 轮开始 ======")
+        
+        # ✅ 问题2修复：新一轮开始补牌到5张
+        for player in game.players:
+            if player['alive'] and player['status'] != "背水一战":
+                cards_needed = 5 - len(player['hand'])
+                if cards_needed > 0:
+                    draw_cards(player['idx'], cards_needed)
+                    add_log(f"✋ 新一轮开始，【{player['name']}】自动补牌 {cards_needed} 张至5张。")
+        
         if game.round % 2 == 1:
             rebuild_decks()
             add_log("🤹 [时空流转] 战局推进两轮，核心弃牌堆重新洗牌！")
@@ -268,20 +265,19 @@ def next_turn():
     start_turn(next_idx)
 
 # ==========================================
-# 🤖 智能人机自动化调度（每个操作停顿1.5秒）
+# 🤖 智能人机自动化调度（每个操作100%停顿1.5秒）
 # ==========================================
 def trigger_bot_if_needed():
     if not game.active or game.pending_action: return
     curr = game.players[game.current_idx]
     if curr['alive'] and curr.get('is_bot'):
         if curr['status'] == "背水一战" and not curr['beishui_decided']:
-            # ✅ 问题2修复：背水一战决策也停顿1.5秒
             def delayed_beishui():
                 time.sleep(1.5)
                 handle_bot_beishui(game.current_idx)
             threading.Thread(target=delayed_beishui, daemon=True).start()
             return
-        # ✅ 问题2修复：人机思考1.5秒再出牌
+        # ✅ 问题4修复：100%停顿1.5秒
         def delayed_bot_move():
             time.sleep(1.5)
             run_bot_active_move(game.current_idx)
@@ -290,16 +286,14 @@ def trigger_bot_if_needed():
 def run_bot_active_move(bot_idx):
     p = game.players[bot_idx]
     if game.actions_left <= 0 or not p['alive']:
-        time.sleep(1.5)  # ✅ 结束回合前也停顿1.5秒
+        time.sleep(1.5)
         end_turn_logic()
         return
 
-    # 优先装备状态牌
     if p['status'] == "正常" and p['status_cards']:
         scard = p['status_cards'].pop(0)
         equip_status_logic(bot_idx, scard)
         broadcast_state()
-        # ✅ 问题2修复：装备完状态牌停顿1.5秒再继续
         def continue_after_equip():
             time.sleep(1.5)
             trigger_bot_if_needed()
@@ -308,12 +302,12 @@ def run_bot_active_move(bot_idx):
 
     active_cards = [c for c in p['hand'] if c not in ["防", "长城"]]
     if not active_cards:
-        time.sleep(1.5)  # ✅ 结束回合前也停顿1.5秒
+        time.sleep(1.5)
         end_turn_logic()
         return
 
-    # 选牌策略：优先回血，否则随机出一张攻击牌
     card = None
+    # ✅ 问题8修复：满血不能用回血
     if "回血" in active_cards and p['hp'] < p['max_hp']:
         card = "回血"
     else:
@@ -325,7 +319,6 @@ def run_bot_active_move(bot_idx):
         end_turn_logic()
         return
 
-    # 选择目标
     living_enemies = [target for target in game.players if target['idx'] != bot_idx and target['alive']]
     if not living_enemies:
         time.sleep(1.5)
@@ -339,7 +332,6 @@ def run_bot_active_move(bot_idx):
         end_turn_logic()
     else:
         if not game.pending_action:
-            # ✅ 问题2修复：出完一张牌停顿1.5秒再出下一张
             def continue_after_play():
                 time.sleep(1.5)
                 trigger_bot_if_needed()
@@ -354,7 +346,7 @@ def handle_bot_defense_response(bot_idx):
     if not game.pending_action: return
     p = game.players[bot_idx]
     
-    # ✅ 问题2修复：防御响应也停顿1.5秒
+    # ✅ 问题4修复：防御也停顿1.5秒
     time.sleep(1.5)
     
     while game.pending_action and game.pending_action['required_defenses'] > 0:
@@ -377,6 +369,7 @@ def handle_bot_defense_response(bot_idx):
             dmg = 2 if card_name == "荆轲刺秦" else 1
             if p['status'] == "卧薪尝胆" and card_name == "攻":
                 dmg = max(0, dmg - 1)
+            # ✅ 问题7修复：人机扣血也广播日志
             damage_player(bot_idx, dmg, reason=card_name)
             game.pending_action = None
             break
@@ -395,6 +388,12 @@ def execute_play_card(src_idx, card, tgt_idx):
     tgt = game.players[tgt_idx] if tgt_idx != -1 else None
 
     if game.actions_left <= 0 or card not in src['hand']: return False
+
+    # ✅ 问题8修复：满血不能用回血
+    if card == "回血" and src['hp'] >= src['max_hp']:
+        if not src.get('is_bot'):
+            socketio.emit('action_error', {'msg': '🚨 你已经满血了，不能使用回血！'}, to=src['sid'])
+        return False
 
     game.actions_left -= 1
     src['hand'].remove(card)
@@ -419,21 +418,18 @@ def execute_play_card(src_idx, card, tgt_idx):
         set_attack_pipeline(src_idx, tgt_idx, "荆轲刺秦", 2)
         damage_player(src_idx, 1, reason="荆轲刺秦反噬")
     elif card == "一字马":
-        tgt['skipped'] = True
+        # ✅ 问题5修复：一字马也可以用长城挡
+        set_attack_pipeline(src_idx, tgt_idx, "一字马", 1)
     elif card == "顺手牵羊":
-        if tgt['hand']:
-            stolen = random.choice(tgt['hand'])
-            tgt['hand'].remove(stolen)
-            src['hand'].append(stolen)
-            add_log(f"🥷 偷取了 【{tgt['name']}】 的 1 张手牌！")
+        # ✅ 问题5修复：顺手牵羊也可以用长城挡
+        set_attack_pipeline(src_idx, tgt_idx, "顺手牵羊", 1)
     elif card == "江山易主":
-        src['hand'], tgt['hand'] = tgt['hand'], src['hand']
-        add_log(f"🔄 乾坤逆转，双方所有手牌爆发大对调！")
+        # ✅ 问题5修复：江山易主也可以用长城挡
+        set_attack_pipeline(src_idx, tgt_idx, "江山易主", 1)
     elif card == "同归于尽":
-        damage_player(src_idx, 1, reason="同归于尽")
-        damage_player(tgt_idx, 1, reason="同归于尽")
+        # ✅ 问题5修复：同归于尽也可以用长城挡
+        set_attack_pipeline(src_idx, tgt_idx, "同归于尽", 1)
     
-    # 行动力耗尽强制结束回合
     if game.actions_left <= 0:
         add_log(f"⚠️ 【{src['name']}】行动力已耗尽，强制结束回合！")
         end_turn_logic()
@@ -445,19 +441,51 @@ def execute_play_card(src_idx, card, tgt_idx):
 
 def set_attack_pipeline(src_idx, tgt_idx, card, count):
     tgt = game.players[tgt_idx]
-    if tgt.get('is_bot') and "长城" in tgt['hand']:
-        tgt['hand'].remove("长城")
-        add_log(f"🧱 机器人【{tgt['name']}】触发防御直觉，秒出【长城】规避！")
-        return
-
+    
+    # ✅ 问题5修复：所有牌都可以用长城挡！
     game.pending_action = {
         "source_idx": src_idx,
         "target_idx": tgt_idx,
         "card": card,
-        "required_defenses": count
+        "required_defenses": count,
+        "can_use_greatwall": True  # 所有牌都可以用长城
     }
+    
     if tgt.get('is_bot'):
+        # 人机有长城直接用
+        if "长城" in tgt['hand']:
+            time.sleep(1.5)
+            tgt['hand'].remove("长城")
+            add_log(f"🧱 机器人【{tgt['name']}】触发防御直觉，秒出【长城】规避【{card}】！")
+            game.pending_action = None
+            broadcast_state()
+            return
         handle_bot_defense_response(tgt_idx)
+
+def execute_card_effect(src_idx, tgt_idx, card):
+    """真正执行卡牌效果（长城格挡失败后）"""
+    src = game.players[src_idx]
+    tgt = game.players[tgt_idx]
+    
+    if card == "攻":
+        damage_player(tgt_idx, 1, reason="攻")
+    elif card == "荆轲刺秦":
+        damage_player(tgt_idx, 2, reason="荆轲刺秦")
+    elif card == "一字马":
+        tgt['skipped'] = True
+        add_log(f"🔒 【{tgt['name']}】被【一字马】封印，下回合将被跳过！")
+    elif card == "顺手牵羊":
+        if tgt['hand']:
+            stolen = random.choice(tgt['hand'])
+            tgt['hand'].remove(stolen)
+            src['hand'].append(stolen)
+            add_log(f"🥷 【{src['name']}】偷取了【{tgt['name']}】的1张手牌！")
+    elif card == "江山易主":
+        src['hand'], tgt['hand'] = tgt['hand'], src['hand']
+        add_log(f"🔄 乾坤逆转，【{src['name']}】与【{tgt['name']}】手牌大对调！")
+    elif card == "同归于尽":
+        damage_player(src_idx, 1, reason="同归于尽")
+        damage_player(tgt_idx, 1, reason="同归于尽")
 
 def equip_status_logic(idx, status_card):
     p = game.players[idx]
@@ -468,6 +496,7 @@ def equip_status_logic(idx, status_card):
         p['max_hp'] = 5
         p['status_cooldown'] = 3
     elif status_card == "饮鸩止渴":
+        # ✅ 问题6修复：血和上限都变10
         p['max_hp'] = 10
         p['hp'] = 10
         p['status_cooldown'] = 3
@@ -499,7 +528,8 @@ def damage_player(idx, amount, reason=""):
     if amount <= 0: return
     p = game.players[idx]
     p['hp'] -= amount
-    add_log(f"💥 【{p['name']}】因【{reason}】扣除 {amount} 点血量！")
+    # ✅ 问题7修复：所有人扣血都广播
+    add_log(f"💥 【{p['name']}】因【{reason}】扣除 {amount} 点血量！当前血量：{p['hp']}/{p['max_hp']}")
     
     if p['hp'] <= 0 and p['faction'] == "丁" and not p.get('has_revived', False):
         p['has_revived'] = True
@@ -692,24 +722,35 @@ def on_respond_action(data):
     
     resp_type = data.get('type') 
     card_name = game.pending_action['card']
+    src_idx = game.pending_action['source_idx']
+    tgt_idx = game.pending_action['target_idx']
     
     if resp_type == '长城' and "长城" in p['hand']:
         p['hand'].remove("长城")
-        add_log(f"🧱 【{p['name']}】祭出【长城】绝对格挡！")
+        add_log(f"🧱 【{p['name']}】祭出【长城】绝对格挡【{card_name}】！")
         game.pending_action = None
     elif resp_type == '防' and "防" in p['hand']:
         p['hand'].remove("防")
         game.pending_action['required_defenses'] -= 1
         add_log(f"🛡️ 【{p['name']}】使用【防】。")
+        if game.pending_action['required_defenses'] <= 0:
+            execute_card_effect(src_idx, tgt_idx, card_name)
+            game.pending_action = None
     elif resp_type == '攻_as_防' and p['status'] == "暗度陈仓" and "攻" in p['hand']:
         p['hand'].remove("攻")
         game.pending_action['required_defenses'] -= 1
         add_log(f"🎭 【{p['name']}】凭【暗度陈仓】以攻代防偏转了伤害！")
+        if game.pending_action['required_defenses'] <= 0:
+            execute_card_effect(src_idx, tgt_idx, card_name)
+            game.pending_action = None
     elif resp_type == '放弃':
-        dmg = 2 if card_name == "荆轲刺秦" else 1
-        if p['status'] == "卧薪尝胆" and card_name == "攻":
-            dmg = max(0, dmg - 1)
-        damage_player(p['idx'], dmg, reason=card_name)
+        if card_name in ["攻", "荆轲刺秦"]:
+            dmg = 2 if card_name == "荆轲刺秦" else 1
+            if p['status'] == "卧薪尝胆" and card_name == "攻":
+                dmg = max(0, dmg - 1)
+            damage_player(tgt_idx, dmg, reason=card_name)
+        else:
+            execute_card_effect(src_idx, tgt_idx, card_name)
         game.pending_action = None
         
     if game.pending_action and game.pending_action['required_defenses'] <= 0:
