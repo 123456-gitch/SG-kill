@@ -170,6 +170,8 @@ def start_game_engine():
     lord_idx = next((i for i, p in enumerate(game.players) if p['faction'] == "冀"), 0)
     add_log("⚔️ —— 乱世沙场大幕开启，生死对局正式激活！ ——")
     
+    # ✅ 【关键修复】游戏启动时直接初始化第一个玩家行动点
+    game.actions_left = game.round + 1
     start_turn(lord_idx)
 
 def start_turn(idx):
@@ -180,6 +182,7 @@ def start_turn(idx):
         return
         
     game.current_idx = idx
+    # ✅ 【关键修复】每个回合开始第一行就设置行动点，确保不遗漏
     game.actions_left = game.round + 1
     p['beishui_decided'] = False
     
@@ -240,7 +243,9 @@ def next_turn():
         
     if next_idx == game.current_idx: return
     
-    if next_idx == 0:
+    # 找到本轮起始玩家（冀的idx），回到他时表示新一轮开始
+    lord_idx = next((i for i, p in enumerate(game.players) if p['faction'] == "冀"), 0)
+    if next_idx == lord_idx:
         game.round += 1
         game.new_round_started = True
         add_log(f"📢 ====== 第 {game.round} 轮开始 ======")
