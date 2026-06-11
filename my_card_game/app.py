@@ -8,11 +8,12 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'sg_ultimate_match_2026_fixed'
 socketio = SocketIO(app, cors_allowed_origins="*")
 
+# ✅ 问题5：总基本牌200张
 BASIC_CARDS = (
     ["攻"] * 50 + ["防"] * 45 + ["长城"] * 20 + ["回血"] * 25 + 
     ["卡牌大师"] * 20 + ["荆轲刺秦"] * 8 + ["一字马"] * 8 + 
-    ["顺手牵羊"] * 15 + ["江山易主"] * 4 + ["同归于尽"] * 10
-)
+    ["顺手牵羊"] * 15 + ["江山易主"] * 4 + ["同归于尽"] * 5
+)  # 50+45+20+25+20+8+8+15+4+5 = 200张！
 STATUS_CARDS = ["背水一战", "饮鸩止渴", "卧薪尝胆", "暗度陈仓"]
 
 class GameEngine:
@@ -134,7 +135,7 @@ def get_player_by_sid(sid):
     return next((p for p in game.players if p.get('sid') == sid), None)
 
 # ==========================================
-# 🎮 核心战斗引擎 - 彻底重写！
+# 🎮 核心战斗引擎
 # ==========================================
 def start_game_engine():
     game.active = True
@@ -157,24 +158,17 @@ def start_game_engine():
         p['max_hp'] = 5
         p['hp'] = 5
         p['faction_revealed'] = False
-        p['hand'] = [game.deck.pop(0) for _ in range(5)]
+        p['hand'] = [game.deck.pop(0) for _ in range(5)]  # ✅ 5×3=15张，200-15=185张
         p['status_cards'] = [game.status_deck.pop(0) for _ in range(2)]
 
-    # ✅✅✅ 真正随机！3个玩家完全随机选第一个出牌的！
-    first_idx = random.randint(0, 2)  # 0、1、2 完全随机！
+    first_idx = random.randint(0, 2)
     game.current_idx = first_idx
-    game.actions_left = 2  # ✅✅✅ 强制=2！
+    game.actions_left = game.round + 1  # ✅ 问题2：正常来，第1轮=2
     
     add_log("⚔️ —— 游戏开始！ ——")
-    add_log(f"🎲 随机选中【{game.players[first_idx]['name']}】作为第一个出牌的玩家！")
     add_log(f"🎬 轮到【{game.players[first_idx]['name']}】出牌")
-    add_log(f"⚡ 行动点强制设置为：{game.actions_left}")
     
-    # ✅✅✅ 广播前、广播中、广播后 三次强制设置！
-    game.actions_left = 2
     broadcast_state()
-    game.actions_left = 2
-    
     trigger_bot_if_needed()
 
 def start_turn(idx):
@@ -185,7 +179,7 @@ def start_turn(idx):
         return
         
     game.current_idx = idx
-    game.actions_left = game.round + 1  # ✅✅✅ 强制设置！
+    game.actions_left = game.round + 1  # ✅ 问题2：第x轮=x+1
     p['beishui_decided'] = False
     
     if p['status_cooldown'] > 0:
@@ -206,11 +200,8 @@ def start_turn(idx):
         return
 
     add_log(f"🎬 —— 【{p['name']}】的回合 ——")
-    add_log(f"⚡ 行动力：{game.actions_left}")
     
-    game.actions_left = game.round + 1  # ✅✅✅ 广播前再强制
     broadcast_state()
-    game.actions_left = game.round + 1  # ✅✅✅ 广播后再强制
     
     if p['status'] != "背水一战":
         trigger_bot_if_needed()
@@ -253,7 +244,7 @@ def next_turn():
     start_turn(next_idx)
 
 # ==========================================
-# 🤖 人机
+# 🤖 人机AI - 问题4修复
 # ==========================================
 def trigger_bot_if_needed():
     if not game.active or game.pending_action: return
@@ -265,6 +256,7 @@ def trigger_bot_if_needed():
                 handle_bot_beishui(game.current_idx)
             threading.Thread(target=delayed_beishui, daemon=True).start()
             return
+        # ✅ 问题7：只有人机需要等1.5秒
         def delayed_bot_move():
             time.sleep(1.5)
             run_bot_active_move(game.current_idx)
@@ -294,7 +286,7 @@ def run_bot_active_move(bot_idx):
         return
 
     card = None
-    if "回血" in active_cards:
+    if "回血" in active_cards and p['hp'] < p['max_hp']:
         card = "回血"
     else:
         playable = [c for c in active_cards if c != "回血"]
@@ -305,12 +297,27 @@ def run_bot_active_move(bot_idx):
         end_turn_logic()
         return
 
+    # ✅✅✅ 问题4：人机攻击逻辑
     living_enemies = [target for target in game.players if target['idx'] != bot_idx and target['alive']]
-    if not living_enemies:
-        time.sleep(1.5)
-        end_turn_logic()
-        return
-    target_idx = random.choice(living_enemies)['idx']
+    
+    if p['faction'] == "丁":
+        # 丁永远随机打
+        target_idx = random.choice(living_enemies)['idx']
+    else:
+        # 检查丁是否已经公开（复活过或死亡）
+        ding_revealed = any(t['faction'] == "丁" and (t.get('has_revived', False) or not t['alive']) 
+                           for t in game.players)
+        
+        if ding_revealed:
+            # 知道谁是丁了，只打不是丁的
+            non_ding_targets = [t for t in living_enemies if t['faction'] != "丁"]
+            if non_ding_targets:
+                target_idx = random.choice(non_ding_targets)['idx']
+            else:
+                target_idx = random.choice(living_enemies)['idx']
+        else:
+            # 不知道丁是谁，随机打
+            target_idx = random.choice(living_enemies)['idx']
 
     success = execute_play_card(bot_idx, card, target_idx)
     if not success:
@@ -325,7 +332,8 @@ def run_bot_active_move(bot_idx):
 
 def handle_bot_beishui(idx):
     p = game.players[idx]
-    sac = min(2, p['hp'] - 1) if p['hp'] > 2 else 0
+    # ✅ 问题1：可以扣到剩1血，5血最多扣4血
+    sac = min(p['hp'] - 1, 3) if p['hp'] > 1 else 0
     execute_beishui_decision(idx, sac)
 
 def handle_bot_defense_response(bot_idx):
@@ -388,8 +396,12 @@ def execute_play_card(src_idx, card, tgt_idx):
         force_hp_limit(src)
     elif card == "卡牌大师":
         draw_cards(src_idx, 2)
+    elif card == "荆轲刺秦":
+        set_attack_pipeline(src_idx, tgt_idx, "荆轲刺秦", 2)
+        # ✅ 问题3：荆轲刺秦反噬，使用者掉1血
+        damage_player(src_idx, 1, "荆轲刺秦反噬")
     else:
-        set_attack_pipeline(src_idx, tgt_idx, card, 2 if card == "荆轲刺秦" else 1)
+        set_attack_pipeline(src_idx, tgt_idx, card, 1)
     
     if game.actions_left <= 0:
         add_log(f"⚠️ 行动力耗尽！")
@@ -463,6 +475,7 @@ def execute_beishui_decision(idx, sacrifice):
     p['beishui_decided'] = True
     
     if sacrifice > 0:
+        # ✅ 问题1：5血可以扣4血，只要留1血就行
         sacrifice = min(sacrifice, p['hp'] - 1)
         p['hp'] -= sacrifice
         draw_count = sacrifice + 1
@@ -486,7 +499,7 @@ def damage_player(idx, amount, reason=""):
         p['has_revived'] = True
         p['hp'] = 2
         p['max_hp'] = max(p['max_hp'], 2)
-        add_log(f"🔥✨ 【丁】复活！")
+        add_log(f"🔥✨ 【丁】复活！身份公开！")
         draw_cards(idx, 2)
         
     if p['hp'] <= 0:
