@@ -7,8 +7,8 @@ from flask_socketio import SocketIO, emit
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'sg_kill_human_perfect_edition_2026_with_bots'
 
-# 自动适配 eventlet / gevent / threading 模式
-socketio = SocketIO(app, cors_allowed_origins="*")
+# 关键：显式允许所有来源，确保跨域没问题
+socketio = SocketIO(app, cors_allowed_origins="*", logger=False, engineio_logger=False)
 
 # 共有200张核心牌配比
 BASIC_CARDS = (
@@ -264,7 +264,7 @@ def next_turn():
 
 
 # ==========================================
-# 🤖 人机智能决策大脑（使用 socketio 后台任务）
+# 🤖 人机智能决策大脑
 # ==========================================
 def trigger_bot_if_needed():
     if not game.active or game.pending_action:
@@ -637,8 +637,14 @@ def check_victory_conditions():
 
 
 # ==========================================
-# 📡 Socket.IO 协议路由处理
+# 📡 Socket.IO 连接事件
 # ==========================================
+@socketio.on('connect')
+def on_connect():
+    # 有人连接时，推送一下大厅状态
+    broadcast_lobby()
+
+
 @socketio.on('change_bot_count')
 def on_change_bot_count(data):
     if not game.active:
@@ -864,8 +870,6 @@ def on_end_turn():
     end_turn_logic()
 
 
-# Render 生产环境通过 gunicorn 启动，不执行此块
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     socketio.run(app, debug=False, host='0.0.0.0', port=port)
-    
