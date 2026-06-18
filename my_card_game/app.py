@@ -1,12 +1,14 @@
+import os
 import random
 import time
-import threading
 from flask import Flask, render_template
 from flask_socketio import SocketIO, emit, request
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'sg_kill_human_perfect_edition_2026_with_bots'
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
+
+# 关键：自动适配 eventlet / gevent / threading 模式
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 # 共有200张核心牌配比
 BASIC_CARDS = (
@@ -19,7 +21,7 @@ STATUS_CARDS = ["背水一战", "饮鸩止渴", "卧薪尝胆", "暗度陈仓"]
 
 class GameEngine:
     def __init__(self):
-        self.bot_count = 2  # 默认2个人机
+        self.bot_count = 2
         self.reset_all()
 
     def reset_all(self):
@@ -262,14 +264,14 @@ def next_turn():
 
 
 # ==========================================
-# 🤖 人机智能决策大脑
+# 🤖 人机智能决策大脑（使用 socketio 后台任务）
 # ==========================================
 def trigger_bot_if_needed():
     if not game.active or game.pending_action:
         return
     curr = game.players[game.current_idx]
     if curr['alive'] and curr.get('is_bot', False):
-        threading.Thread(target=run_bot_turn, args=(game.current_idx,), daemon=True).start()
+        socketio.start_background_task(run_bot_turn, game.current_idx)
 
 
 def get_bot_playable_cards(bot_idx):
@@ -426,7 +428,7 @@ def execute_defense_response(idx, resp_type):
     broadcast_state()
 
     if game.active and game.pending_action and game.pending_action['target_idx'] == idx:
-        threading.Thread(target=run_bot_defense, args=(idx,), daemon=True).start()
+        socketio.start_background_task(run_bot_defense, idx)
     else:
         if game.active and not game.pending_action:
             trigger_bot_if_needed()
@@ -498,7 +500,7 @@ def set_attack_pipeline(src_idx, tgt_idx, card, count):
     }
     tgt = game.players[tgt_idx]
     if tgt.get('is_bot', False):
-        threading.Thread(target=run_bot_defense, args=(tgt_idx,), daemon=True).start()
+        socketio.start_background_task(run_bot_defense, tgt_idx)
 
 
 def execute_card_effect(src_idx, tgt_idx, card):
@@ -862,6 +864,7 @@ def on_end_turn():
     end_turn_logic()
 
 
+# Render 生产环境：通过 gunicorn 启动，不执行此块
 if __name__ == '__main__':
-    # 关键：host='0.0.0.0' 允许公网IP访问，实现跨网络联机
-    socketio.run(app, debug=False, host='0.0.0.0', port=5000, allow_unsafe_werkzeug=True)
+    port = int(os.environ.get('PORT', 5000))
+    socketio.run(app, debug=False, host='0.0.0.0', port=port)
