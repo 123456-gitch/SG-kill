@@ -135,6 +135,7 @@
         }
         .conn-online { background: #00b894; color: white; }
         .conn-offline { background: #e43f5a; color: white; }
+        .conn-connecting { background: #f39c12; color: white; }
     </style>
 </head>
 <body>
@@ -142,7 +143,7 @@
     <header>
         <h1>三国kill ⚔️ 真人联机/AI对抗端</h1>
         <div style="display: flex; align-items: center;">
-            <span id="conn-status" class="connection-status conn-offline">连接中...</span>
+            <span id="conn-status" class="connection-status conn-connecting">连接中...</span>
             <div id="game-meta" style="font-size: 13px; color: #cbd5e1; margin-right: 15px;">大厅集结中...</div>
             <button class="btn" style="width:auto; padding:5px 12px; font-size:12px;" onclick="resetGame()">暴力重置房间</button>
         </div>
@@ -150,7 +151,6 @@
 
     <div class="main-container">
         <div class="battle-zone">
-            <!-- 组队大厅 -->
             <div id="lobby">
                 <div style="font-size:20px; margin-bottom:20px; color:#00fff0; font-weight:bold;">⚔️ 决战大厅 ⚔️</div>
                 <div class="form-group">
@@ -169,7 +169,6 @@
                 <div id="lobby-status" style="margin-top:15px; font-size:12px; color:#cbd5e1;"></div>
             </div>
 
-            <!-- 主战场面板 -->
             <div id="game-board" style="display: none;">
                 <div style="text-align: center; margin-bottom: 10px; font-size: 12px; color: #ffb423;">
                     💡 [操作指引] 打出指向性卡牌前，请先点击其他玩家的头像，锁定目标（亮起红色高亮框）再点击出手！
@@ -181,10 +180,8 @@
         </div>
 
         <div class="side-bar">
-            <!-- 实时战况志 -->
             <div class="log-container" id="log-box"></div>
 
-            <!-- 规则图鉴 -->
             <div class="rules-container">
                 <div class="rules-title">📜 游戏机制与全卡牌规则图鉴</div>
                 <div class="rules-section">
@@ -231,7 +228,6 @@
         </div>
     </div>
 
-    <!-- 用户行动交互区 -->
     <div class="my-zone" id="player-interaction" style="display: none;">
         <div class="zone-layout">
             <div class="hand-wrapper">
@@ -248,7 +244,6 @@
         </div>
     </div>
 
-    <!-- 结算弹窗 -->
     <div id="victory-modal">
         <div class="victory-box">
             <h2 id="victory-title">🏆 决战落幕 🏆</h2>
@@ -258,8 +253,14 @@
     </div>
 
     <script>
-        // 自动连接当前域名（部署到服务器后，访问服务器IP即可自动联机）
-        const socket = io();
+        // 自动连接当前域名（部署到 Render 后自动适配）
+        const socket = io({
+            transports: ['websocket', 'polling'],
+            reconnection: true,
+            reconnectionDelay: 1000,
+            reconnectionDelayMax: 5000
+        });
+
         let myIndex = null;
         let selectedTargetIdx = -1;
         let currentStatusCooldown = 0;
@@ -274,6 +275,11 @@
         socket.on('disconnect', () => {
             const statusEl = document.getElementById('conn-status');
             statusEl.textContent = '● 连接断开';
+            statusEl.className = 'connection-status conn-offline';
+        });
+        socket.on('connect_error', () => {
+            const statusEl = document.getElementById('conn-status');
+            statusEl.textContent = '● 连接失败';
             statusEl.className = 'connection-status conn-offline';
         });
 
@@ -435,23 +441,4 @@
                         <div class="p-header">
                             <span class="p-name">${p.name} ${p.idx === myIndex ? '<span style="color:#00fff0;">(你)</span>' : ''}</span>
                             <span class="faction-tag fac-${p.faction}">${p.faction}</span>
-                        </div>
-                        <div class="hp-bar">${hpHearts} (${p.hp}/${p.max_hp})</div>
-                        <div style="font-size:12px; color:#cbd5e1; margin-top:4px;">🎴 手牌：${p.hand_count} 张</div>
-                        <div>
-                            <span class="status-badge st-${p.status}">状态：${p.status} ${p.status_cooldown > 0 ? `(CD:${p.status_cooldown})` : ''}</span>
-                        </div>
-                    </div>
-                `;
-            });
-
-            if (data.players[oldTarget] && !data.players[oldTarget].alive) {
-                selectedTargetIdx = -1;
-            }
-
-            const handAnchor = document.getElementById("basic-hand-anchor");
-            handAnchor.innerHTML = "";
-            data.my_cards.forEach(card => {
-                if (data.my_status === "暗度陈仓" && card === "防") {
-                    handAnchor.innerHTML += `
-                        <div style="display:flex; flex-direction:column;
+                       
