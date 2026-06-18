@@ -1,13 +1,13 @@
 import os
 import random
 import time
-from flask import Flask, render_template
-from flask_socketio import SocketIO, emit, request
+from flask import Flask, render_template, request
+from flask_socketio import SocketIO, emit
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'sg_kill_human_perfect_edition_2026_with_bots'
 
-# 关键：自动适配 eventlet / gevent / threading 模式
+# 自动适配 eventlet / gevent / threading 模式
 socketio = SocketIO(app, cors_allowed_origins="*")
 
 # 共有200张核心牌配比
@@ -864,7 +864,7 @@ def on_end_turn():
     end_turn_logic()
 
 
-# Render 生产环境：通过 gunicorn 启动，不执行此块
+# Render 生产环境通过 gunicorn 启动，不执行此块
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     socketio.run(app, debug=False, host='0.0.0.0', port=port)
