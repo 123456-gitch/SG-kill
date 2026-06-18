@@ -21,6 +21,7 @@
         input, select { width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #0f4c81; background: #162447; color: #fff; outline: none; }
         .btn { width: 100%; padding: 12px; font-weight: bold; cursor: pointer; background: #e43f5a; border: none; border-radius: 6px; color: white; transition: 0.2s; font-size: 15px; }
         .btn:hover { background: #ff4d6d; box-shadow: 0 0 12px rgba(228,63,90,0.5); }
+        .btn:disabled { background: #555; cursor: not-allowed; opacity: 0.6; }
 
         .players-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px; }
         .player-card { background: #162447; border: 3px solid #1f4068; border-radius: 10px; padding: 15px; position: relative; cursor: pointer; transition: 0.2s; }
@@ -79,6 +80,7 @@
 
         .card-item { background: #1f4068; border: 1px solid #0f4c81; padding: 10px 14px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 14px; min-width: 80px; text-align: center; color: white; transition: 0.2s; }
         .card-item:hover { background: #00fff0; color: #1a1a2e; transform: translateY(-3px); }
+        .card-item:disabled { background: #535c68; color: #aaa; cursor: not-allowed; transform: none; }
 
         .st-card-item { background: #341f97; border-color: #5f27cd; }
         .st-card-item:hover { background: #ffa502; color: #000; }
@@ -136,6 +138,17 @@
         .conn-online { background: #00b894; color: white; }
         .conn-offline { background: #e43f5a; color: white; }
         .conn-connecting { background: #f39c12; color: white; }
+
+        .conn-error-box {
+            background: #2d142c;
+            border: 2px solid #e43f5a;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            color: #ff6b6b;
+            font-size: 13px;
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -153,6 +166,11 @@
         <div class="battle-zone">
             <div id="lobby">
                 <div style="font-size:20px; margin-bottom:20px; color:#00fff0; font-weight:bold;">⚔️ 决战大厅 ⚔️</div>
+
+                <div id="conn-error" class="conn-error-box">
+                    ⚠️ 连接服务器失败！请检查网络或刷新页面重试。
+                </div>
+
                 <div class="form-group">
                     <label>本局昵称（断线后输入相同昵称可重新连入）：</label>
                     <input type="text" id="username" placeholder="输入战神名...">
@@ -165,7 +183,7 @@
                         <option value="0">不要人机 (纯真人博弈)</option>
                     </select>
                 </div>
-                <button class="btn" onclick="joinGame()">确认加入对局</button>
+                <button class="btn" id="join-btn" onclick="joinGame()" disabled>连接服务器中...</button>
                 <div id="lobby-status" style="margin-top:15px; font-size:12px; color:#cbd5e1;"></div>
             </div>
 
@@ -253,7 +271,7 @@
     </div>
 
     <script>
-        // 自动连接当前域名（部署到 Render 后自动适配）
+        // 自动连接当前域名
         const socket = io({
             transports: ['websocket', 'polling'],
             reconnection: true,
@@ -265,25 +283,57 @@
         let selectedTargetIdx = -1;
         let currentStatusCooldown = 0;
         let gameState = null;
+        let isConnected = false;
 
         // 连接状态显示
+        function updateConnStatus(status, text) {
+            const statusEl = document.getElementById('conn-status');
+            statusEl.textContent = text;
+            statusEl.className = 'connection-status conn-' + status;
+
+            const joinBtn = document.getElementById('join-btn');
+            const connError = document.getElementById('conn-error');
+
+            if (status === 'online') {
+                isConnected = true;
+                if (joinBtn) {
+                    joinBtn.disabled = false;
+                    joinBtn.textContent = '确认加入对局';
+                }
+                if (connError) connError.style.display = 'none';
+            } else {
+                isConnected = false;
+                if (joinBtn) {
+                    joinBtn.disabled = true;
+                    joinBtn.textContent = status === 'connecting' ? '连接服务器中...' : '服务器连接失败';
+                }
+                if (status === 'offline' && connError) {
+                    connError.style.display = 'block';
+                }
+            }
+        }
+
         socket.on('connect', () => {
-            const statusEl = document.getElementById('conn-status');
-            statusEl.textContent = '● 已连接';
-            statusEl.className = 'connection-status conn-online';
+            updateConnStatus('online', '● 已连接');
         });
+
         socket.on('disconnect', () => {
-            const statusEl = document.getElementById('conn-status');
-            statusEl.textContent = '● 连接断开';
-            statusEl.className = 'connection-status conn-offline';
+            updateConnStatus('offline', '● 连接断开');
         });
+
         socket.on('connect_error', () => {
-            const statusEl = document.getElementById('conn-status');
-            statusEl.textContent = '● 连接失败';
-            statusEl.className = 'connection-status conn-offline';
+            updateConnStatus('offline', '● 连接失败');
+        });
+
+        socket.on('reconnecting', () => {
+            updateConnStatus('connecting', '● 重连中...');
         });
 
         function joinGame() {
+            if (!isConnected) {
+                alert("⚠️ 还没连上服务器，请稍等或刷新页面！");
+                return;
+            }
             const name = document.getElementById("username").value.trim();
             if(!name) {
                 alert("请输入昵称！");
@@ -295,11 +345,16 @@
         }
 
         function changeBotCount() {
+            if (!isConnected) return;
             const bc = document.getElementById("bot-select").value;
             socket.emit('change_bot_count', { bot_count: bc });
         }
 
         function resetGame() {
+            if (!isConnected) {
+                alert("⚠️ 还没连上服务器！");
+                return;
+            }
             if(confirm("确定要强制重置整个房间吗？所有玩家都会被踢回大厅。")) {
                 socket.emit('reset_game');
             }
@@ -422,23 +477,4 @@
             }
 
             const oldTarget = selectedTargetIdx;
-            const anchor = document.getElementById("players-anchor");
-            anchor.innerHTML = "";
-
-            data.players.forEach(p => {
-                const isCurrentTurn = (p.idx === data.current_idx);
-                let cardClass = "player-card";
-                if (!p.alive) cardClass += " dead";
-                else if (isCurrentTurn) cardClass += " active-turn";
-                if (p.idx === oldTarget && p.alive) cardClass += " selected-target";
-
-                let hpHearts = "";
-                for(let h=0; h<p.hp; h++) hpHearts += "❤️";
-                for(let m=p.hp; m<p.max_hp; m++) hpHearts += "🖤";
-
-                anchor.innerHTML += `
-                    <div class="${cardClass}" id="pcard-${p.idx}" onclick="selectTarget(${p.idx})">
-                        <div class="p-header">
-                            <span class="p-name">${p.name} ${p.idx === myIndex ? '<span style="color:#00fff0;">(你)</span>' : ''}</span>
-                            <span class="faction-tag fac-${p.faction}">${p.faction}</span>
-                       
+            const anchor = document.getElementById
