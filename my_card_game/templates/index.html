@@ -3,54 +3,455 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>三国Kill - 全球联机决战端</title>
+    <title>三国kill - 真人博弈与AI决战端</title>
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <style>
-        /* 保持原有的UI设计，优化移动端表现 */
-        body { background: #1a1a2e; color: #e2e8f0; font-family: sans-serif; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
-        .main-container { flex: 1; display: flex; overflow: hidden; }
-        .battle-zone { flex: 3; padding: 15px; overflow-y: auto; background: #1a1a2e; }
-        #lobby { background: #1f4068; padding: 25px; border-radius: 12px; margin: auto; max-width: 400px; text-align: center; }
-        .btn { padding: 12px 20px; background: #e43f5a; border: none; color: white; cursor: pointer; border-radius: 6px; width: 100%; margin-top: 10px; }
-        .log-container { flex: 1; background: #0d0d18; padding: 10px; font-size: 12px; overflow-y: auto; color: #a0aec0; }
-        /* 补充原有CSS样式... */
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background: #1a1a2e; color: #e2e8f0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+
+        header { background: #162447; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0f4c81; }
+        h1 { font-size: 22px; color: #e43f5a; letter-spacing: 2px; text-shadow: 0 0 8px rgba(228,63,90,0.6); }
+
+        .main-container { display: flex; flex: 1; overflow: hidden; }
+        .battle-zone { flex: 3; display: flex; flex-direction: column; padding: 15px; overflow-y: auto; background: linear-gradient(180deg, #1f1f3a 0%, #161625 100%); }
+
+        #lobby { background: #1f4068; padding: 25px; border-radius: 12px; margin: auto; max-width: 480px; width: 100%; box-shadow: 0 10px 25px rgba(0,0,0,0.5); text-align: center; }
+        .form-group { margin-bottom: 15px; text-align: left; }
+        label { display: block; font-size: 13px; margin-bottom: 6px; color: #cbd5e1; }
+        input, select { width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #0f4c81; background: #162447; color: #fff; outline: none; }
+        .btn { width: 100%; padding: 12px; font-weight: bold; cursor: pointer; background: #e43f5a; border: none; border-radius: 6px; color: white; transition: 0.2s; font-size: 15px; }
+        .btn:hover { background: #ff4d6d; box-shadow: 0 0 12px rgba(228,63,90,0.5); }
+
+        .players-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px; }
+        .player-card { background: #162447; border: 3px solid #1f4068; border-radius: 10px; padding: 15px; position: relative; cursor: pointer; transition: 0.2s; }
+
+        .player-card.selected-target {
+            border: 4px solid #ff0000 !important;
+            box-shadow: 0 0 25px #ff0000 !important;
+            transform: scale(1.02);
+        }
+        .player-card.selected-target::after {
+            content: "🎯 已锁敌";
+            position: absolute;
+            top: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #ff0000;
+            color: white;
+            padding: 2px 6px;
+            font-size: 11px;
+            font-weight: bold;
+            border-radius: 4px;
+        }
+
+        .player-card.active-turn { border-color: #ffb423 !important; background: #223663; }
+        .player-card.dead { background: #2d2d3a !important; border-color: #4a4a5a !important; opacity: 0.6; cursor: not-allowed; }
+
+        .p-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; border-bottom: 1px solid #1f4068; padding-bottom: 5px; }
+        .p-name { font-weight: bold; color: #fff; font-size: 15px; }
+
+        .faction-tag { padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: bold; }
+        .fac-隐藏 { background: #4a5568; color: #cbd5e1; }
+        .fac-司 { background: #d63031; color: white; }
+        .fac-丁 { background: #00b894; color: white; }
+        .fac-冀 { background: #0984e3; color: white; }
+
+        .status-badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: bold; margin-top: 5px; }
+        .st-正常 { background: #2f3640; color: #dcdde1; }
+        .st-背水一战 { background: #c23616; color: #fff; }
+        .st-饮鸩止渴 { background: #8c7ae6; color: #fff; }
+        .st-卧薪尝胆 { background: #e1b12c; color: #2f3640; }
+        .st-暗度陈仓 { background: #00a8ff; color: #fff; }
+
+        .hp-bar { color: #ff7675; font-size: 14px; margin: 4px 0; font-weight: bold; }
+
+        .prompt-panel { background: #2d142c; border: 2px dashed #e43f5a; padding: 15px; border-radius: 8px; margin-bottom: 15px; text-align: center; }
+        .prompt-title { color: #ff4d6d; font-weight: bold; margin-bottom: 10px; font-size: 15px; }
+        .prompt-btns { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
+        .btn-action { padding: 8px 16px; font-weight: bold; background: #162447; border: 1px solid #0f4c81; color: white; border-radius: 4px; cursor: pointer; transition: 0.1s; }
+        .btn-action:hover { background: #e43f5a; }
+
+        .my-zone { background: #162447; border-top: 3px solid #0f4c81; padding: 15px; }
+        .zone-layout { display: flex; justify-content: space-between; align-items: center; }
+        .hand-wrapper { flex: 1; margin-right: 20px; }
+        .section-title { font-size: 13px; color: #00fff0; font-weight: bold; margin-bottom: 8px; }
+        .cards-list { display: flex; gap: 10px; flex-wrap: wrap; }
+
+        .card-item { background: #1f4068; border: 1px solid #0f4c81; padding: 10px 14px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 14px; min-width: 80px; text-align: center; color: white; transition: 0.2s; }
+        .card-item:hover { background: #00fff0; color: #1a1a2e; transform: translateY(-3px); }
+
+        .st-card-item { background: #341f97; border-color: #5f27cd; }
+        .st-card-item:hover { background: #ffa502; color: #000; }
+        .st-cd-tag { font-size: 10px; color: #ff7675; margin-left: 4px; }
+
+        .side-bar { flex: 1.3; background: #111122; border-left: 2px solid #162447; display: flex; flex-direction: column; overflow: hidden; }
+        .log-container { flex: 1; padding: 12px; overflow-y: auto; font-size: 12px; font-family: monospace; background: #0d0d18; }
+        .log-line { margin-bottom: 6px; border-bottom: 1px solid #161625; padding-bottom: 4px; color: #a0aec0; }
+
+        .rules-container { flex: 1.4; padding: 15px; overflow-y: auto; font-size: 12px; background: #16162a; border-top: 1px solid #1f4068; }
+        .rules-title { font-size: 14px; font-weight: bold; color: #ffb423; margin-bottom: 10px; border-bottom: 1px solid #ffb423; padding-bottom: 4px; text-align: center; }
+        .rules-section { margin-bottom: 12px; }
+        .rules-sub { font-weight: bold; color: #00fff0; margin-bottom: 4px; }
+        .rules-text { color: #cbd5e1; line-height: 1.5; }
+
+        .table-desc { width: 100%; border-collapse: collapse; margin-top: 5px; }
+        .table-desc th, .table-desc td { padding: 4px; border: 1px solid #1f4068; text-align: left; font-size: 11px; }
+        .table-desc th { background: #1f4068; color: #ffb423; }
+
+        #victory-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+        .victory-box {
+            background: #1f4068;
+            padding: 40px;
+            border-radius: 12px;
+            border: 3px solid #ffb423;
+            text-align: center;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 0 35px #ffb423;
+            animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        @keyframes popIn {
+            from { transform: scale(0.8); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        .connection-status {
+            font-size: 12px;
+            padding: 4px 10px;
+            border-radius: 4px;
+            margin-right: 10px;
+        }
+        .conn-online { background: #00b894; color: white; }
+        .conn-offline { background: #e43f5a; color: white; }
     </style>
 </head>
 <body>
-    <div id="lobby">
-        <h2>三国Kill联机大厅</h2>
-        <input type="text" id="username" placeholder="请输入你的大名" style="width:100%; padding:10px; margin-bottom:10px;">
-        <select id="bot-count" style="width:100%; padding:10px; margin-bottom:10px;">
-            <option value="2">补2个人机</option>
-            <option value="1">补1个人机</option>
-            <option value="0">不要人机</option>
-        </select>
-        <button class="btn" onclick="joinGame()">加入对局</button>
-        <button class="btn" style="background:#4a5568;" onclick="resetGame()">强制重置服务器</button>
+
+    <header>
+        <h1>三国kill ⚔️ 真人联机/AI对抗端</h1>
+        <div style="display: flex; align-items: center;">
+            <span id="conn-status" class="connection-status conn-offline">连接中...</span>
+            <div id="game-meta" style="font-size: 13px; color: #cbd5e1; margin-right: 15px;">大厅集结中...</div>
+            <button class="btn" style="width:auto; padding:5px 12px; font-size:12px;" onclick="resetGame()">暴力重置房间</button>
+        </div>
+    </header>
+
+    <div class="main-container">
+        <div class="battle-zone">
+            <!-- 组队大厅 -->
+            <div id="lobby">
+                <div style="font-size:20px; margin-bottom:20px; color:#00fff0; font-weight:bold;">⚔️ 决战大厅 ⚔️</div>
+                <div class="form-group">
+                    <label>本局昵称（断线后输入相同昵称可重新连入）：</label>
+                    <input type="text" id="username" placeholder="输入战神名...">
+                </div>
+                <div class="form-group">
+                    <label>人机数量配置：</label>
+                    <select id="bot-select" onchange="changeBotCount()">
+                        <option value="2" selected>补满 2 个人机 (单人速开)</option>
+                        <option value="1">补满 1 个人机 (双人配合)</option>
+                        <option value="0">不要人机 (纯真人博弈)</option>
+                    </select>
+                </div>
+                <button class="btn" onclick="joinGame()">确认加入对局</button>
+                <div id="lobby-status" style="margin-top:15px; font-size:12px; color:#cbd5e1;"></div>
+            </div>
+
+            <!-- 主战场面板 -->
+            <div id="game-board" style="display: none;">
+                <div style="text-align: center; margin-bottom: 10px; font-size: 12px; color: #ffb423;">
+                    💡 [操作指引] 打出指向性卡牌前，请先点击其他玩家的头像，锁定目标（亮起红色高亮框）再点击出手！
+                </div>
+
+                <div class="players-row" id="players-anchor"></div>
+                <div id="prompt-zone"></div>
+            </div>
+        </div>
+
+        <div class="side-bar">
+            <!-- 实时战况志 -->
+            <div class="log-container" id="log-box"></div>
+
+            <!-- 规则图鉴 -->
+            <div class="rules-container">
+                <div class="rules-title">📜 游戏机制与全卡牌规则图鉴</div>
+                <div class="rules-section">
+                    <div class="rules-sub">一、阵营与终极胜负法则</div>
+                    <div class="rules-text">▪ <b>【司】(叛逆者)</b>：独立作战，胜利条件为：<b>击杀【冀】</b>。</div>
+                    <div class="rules-text">▪ <b>【冀】(主星)</b>：与丁同盟，胜利条件为：<b>联合击杀【司】</b>。</div>
+                    <div class="rules-text">▪ <b>【丁】(护卫)</b>：守护神。血量首次归零时<b>原地复活</b>（回至2体力并抽2张牌），并<b>向全场强制公开真实身份</b>！</div>
+                    <div class="rules-text" style="color: #ff4d6d; font-weight: bold; margin-top: 4px; border-left: 2px solid #ff4d6d; padding-left: 6px;">
+                        🌟 【特别觉醒规则】当【丁】死亡并原地复活致使全场身份公开时，作为对抗惩罚，【司】(叛逆者) 将瞬间强制无条件获得 10 张基本手牌！
+                    </div>
+                </div>
+                <div class="rules-section">
+                    <div class="rules-sub">二、行动力与回合规则</div>
+                    <div class="rules-text">▪ <b>第X轮 = X+1行动力</b>：第1轮2点，第2轮3点，以此类推</div>
+                    <div class="rules-text">▪ <b>3玩家 = 1轮</b>：3个存活玩家各出完牌为1轮，1个玩家出牌为1回合</div>
+                    <div class="rules-text">▪ <b>新一轮开始补牌</b>：每轮开始时所有玩家自动补手牌至5张（背水一战除外）</div>
+                    <div class="rules-text">▪ <b>行动力耗尽强制结束</b>：行动力用完必须结束回合</div>
+                </div>
+                <div class="rules-section">
+                    <div class="rules-sub">三、核心基础卡牌数据库（共200张）</div>
+                    <table class="table-desc">
+                        <tr><th>牌名</th><th>类型</th><th>效果说明 (每次出牌耗1行动力)</th></tr>
+                        <tr><td>攻</td><td>主动</td><td>对目标造成 1 点伤害，可被【防/长城】抵挡。</td></tr>
+                        <tr><td>防</td><td>被动</td><td><b>防守绝技。只能响应【攻】或【荆轲刺秦】。无法直接用它抵抗顺手、一字马等技能牌。</b></td></tr>
+                        <tr><td>长城</td><td>被动</td><td>全面免疫神技！<b>1张可废掉整张针对你的牌</b>，完全免疫其效果。</td></tr>
+                        <tr><td>回血</td><td>主动</td><td>恢复 1 点生命，不可超过上限。满血也可使用但无实效。</td></tr>
+                        <tr><td>卡牌大师</td><td>主动</td><td>强力过牌，立刻额外补充 2 张新基础手牌。</td></tr>
+                        <tr><td>荆轲刺秦</td><td>主动</td><td><b>暴击伤害！造成 2 点伤害（需要2张【防】抵消），结算后使用者会自损 1 点反噬。能用1张【长城】完美化解。</b></td></tr>
+                        <tr><td>一字马</td><td>主动</td><td>控制咒术，强行剥夺目标下个轮次的所有行动权。只能被【长城】完美抵挡。</td></tr>
+                        <tr><td>顺手牵羊</td><td>主动</td><td>强行摸走目标 1 张手牌。只能被【长城】完美抵挡。</td></tr>
+                        <tr><td>江山易主</td><td>主动</td><td>将自己全部手牌与目标大对调。只能被【长城】完美抵挡。</td></tr>
+                        <tr><td>同归于尽</td><td>主动</td><td>自爆袭击，让彼此强制扣减 1 点体力。只能被【长城】完美抵挡。</td></tr>
+                    </table>
+                </div>
+                <div class="rules-section">
+                    <div class="rules-sub">四、状态卡牌觉醒词条</div>
+                    <div class="rules-text">每回合开始时刷新2张不重复状态牌，冷却时间均为 3 回合。</div>
+                    <div class="rules-text">▪ <b>【背水一战】</b>：上限重置为5。轮到自己时可献祭 X 点血，暴抽 X+1 张（最低留1血）。</div>
+                    <div class="rules-text">▪ <b>【饮鸩止渴】</b>：血量与上限瞬间撑爆至 10！<b>每回合开始毒发</b>，上限减3（最低为1）。</div>
+                    <div class="rules-text">▪ <b>【卧薪尝胆】</b>：上限5。<b>自带减伤（受【攻】伤害降为0，受【荆轲刺秦】降为1）</b>，但己方回合只要主动打出非【回血】手牌，就会受到执念反噬自残扣1血。</div>
+                    <div class="rules-text">▪ <b>【暗度陈仓】</b>：上限5。出牌时可将【防】当【攻】打出；防守时可将【攻】当【防】使用。</div>
+                </div>
+            </div>
+        </div>
     </div>
 
-    <div id="game-board" style="display:none; height: 100%; flex-direction: column;">
-        <!-- 游戏战场区，引用上述逻辑 -->
+    <!-- 用户行动交互区 -->
+    <div class="my-zone" id="player-interaction" style="display: none;">
+        <div class="zone-layout">
+            <div class="hand-wrapper">
+                <div class="section-title" id="action-turn-title">🎮 战斗状态指示</div>
+                <div class="cards-list" id="basic-hand-anchor"></div>
+            </div>
+            <div class="hand-wrapper" style="max-width: 260px;">
+                <div class="section-title">⚡ 状态装备牌栏 (点击装备/更换)</div>
+                <div class="cards-list" id="status-hand-anchor"></div>
+            </div>
+            <div>
+                <button class="btn" style="background:#00b894; padding:15px 25px;" onclick="endTurn()">结束我的出牌回合</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 结算弹窗 -->
+    <div id="victory-modal">
+        <div class="victory-box">
+            <h2 id="victory-title">🏆 决战落幕 🏆</h2>
+            <p id="victory-msg" style="font-size: 16px; color: #fff; margin: 20px 0; line-height: 1.6;"></p>
+            <button class="btn" onclick="resetGame()" style="background: #e43f5a; max-width: 200px; margin: 0 auto; display: block;">重新回大厅</button>
+        </div>
     </div>
 
     <script>
-        // 核心联机配置：请将此处的 IP 换成你云服务器的公网 IP
-        const SERVER_URL = "http://你的服务器公网IP:5000"; 
-        const socket = io(SERVER_URL);
+        // 自动连接当前域名（部署到服务器后，访问服务器IP即可自动联机）
+        const socket = io();
+        let myIndex = null;
+        let selectedTargetIdx = -1;
+        let currentStatusCooldown = 0;
+        let gameState = null;
+
+        // 连接状态显示
+        socket.on('connect', () => {
+            const statusEl = document.getElementById('conn-status');
+            statusEl.textContent = '● 已连接';
+            statusEl.className = 'connection-status conn-online';
+        });
+        socket.on('disconnect', () => {
+            const statusEl = document.getElementById('conn-status');
+            statusEl.textContent = '● 连接断开';
+            statusEl.className = 'connection-status conn-offline';
+        });
 
         function joinGame() {
-            const name = document.getElementById("username").value;
-            const bots = document.getElementById("bot-count").value;
-            socket.emit('change_bot_count', { bot_count: parseInt(bots) });
+            const name = document.getElementById("username").value.trim();
+            if(!name) {
+                alert("请输入昵称！");
+                return;
+            }
+            const bc = document.getElementById("bot-select").value;
+            socket.emit('change_bot_count', { bot_count: bc });
             socket.emit('join_game', { name: name });
         }
 
-        function resetGame() {
-            socket.emit('reset_game');
-            window.location.reload();
+        function changeBotCount() {
+            const bc = document.getElementById("bot-select").value;
+            socket.emit('change_bot_count', { bot_count: bc });
         }
-        
-        // ... 原有的 socket 监听和业务逻辑 ...
-    </script>
-</body>
-</html>
+
+        function resetGame() {
+            if(confirm("确定要强制重置整个房间吗？所有玩家都会被踢回大厅。")) {
+                socket.emit('reset_game');
+            }
+        }
+
+        function selectTarget(idx) {
+            if (idx === myIndex) {
+                alert("🚩 操作提示：不能锁定你自己哦！请点击其他玩家头像框进行对敌锁定。");
+                return;
+            }
+
+            const tgtCard = document.getElementById(`pcard-${idx}`);
+            if (tgtCard && tgtCard.classList.contains('dead')) {
+                alert("💀 目标已阵亡，无法进行锁定！");
+                return;
+            }
+
+            selectedTargetIdx = idx;
+            const cards = document.getElementsByClassName('player-card');
+            for(let card of cards) {
+                card.classList.remove('selected-target');
+            }
+            if (tgtCard) tgtCard.classList.add('selected-target');
+        }
+
+        function playCard(cardName) {
+            if (!gameState || gameState.current_idx !== myIndex) {
+                alert("🚨 现在不是你的出牌回合！");
+                return;
+            }
+            if (gameState.is_my_response) {
+                alert("🚨 请先处理当前的防御响应！");
+                return;
+            }
+
+            if (["攻", "荆轲刺秦", "一字马", "顺手牵羊", "江山易主", "同归于尽"].includes(cardName)) {
+                if (selectedTargetIdx === -1) {
+                    alert("🚨 请先在上方点击选定一个其他存活玩家（使其亮起红色高亮框）作为打击目标！");
+                    return;
+                }
+            }
+            socket.emit('play_card', { card: cardName, target: selectedTargetIdx });
+        }
+
+        function playAnduxu(cardName, realIntent) {
+            if (!gameState || gameState.current_idx !== myIndex) {
+                alert("🚨 现在不是你的出牌回合！");
+                return;
+            }
+            if (selectedTargetIdx === -1) {
+                alert("🚨 【暗度陈仓】变形打击也必须在上方点击选择一个目标！");
+                return;
+            }
+            socket.emit('play_card', { card: cardName, target: selectedTargetIdx, intent: realIntent });
+        }
+
+        function equipStatus(cardName) {
+            if (!gameState || gameState.current_idx !== myIndex) {
+                alert("🚨 只能在自己的出牌回合装备状态牌！");
+                return;
+            }
+            if (currentStatusCooldown > 0) {
+                alert("🚨 当前状态还在冷却中，无法更换！");
+                return;
+            }
+            socket.emit('equip_status', { card: cardName });
+        }
+
+        function respond(type) {
+            socket.emit('respond_action', { type: type });
+        }
+
+        function beishuiChoose(sacrificeVal) {
+            socket.emit('beishui_decision', { sacrifice: sacrificeVal });
+        }
+
+        function endTurn() {
+            if (!gameState || gameState.current_idx !== myIndex) {
+                alert("🚨 现在不是你的回合！");
+                return;
+            }
+            socket.emit('end_turn');
+        }
+
+        socket.on('lobby_update', (data) => {
+            document.getElementById("lobby-status").innerHTML = `
+                <p style="font-size:14px; margin-bottom:8px;">⚔️ 游戏大厅真人：<b>${data.count} / ${3 - data.bot_count}</b> (补齐 ${data.bot_count} 个人机即可自动开启)</p>
+                <div style="margin-top:8px;">已就绪真人：${data.players.length > 0 ? data.players.map(p => `<span style="background:#0f4c81; padding:4px 8px; border-radius:4px; margin-right:5px; font-weight:bold;">${p.name}</span>`).join(' ') : '无'}</div>
+            `;
+            document.getElementById("bot-select").value = data.bot_count;
+        });
+
+        socket.on('game_update', (data) => {
+            gameState = data;
+            document.getElementById("lobby").style.display = "none";
+            document.getElementById("game-board").style.display = "block";
+            document.getElementById("player-interaction").style.display = "block";
+
+            if (data.my_idx !== undefined) {
+                myIndex = data.my_idx;
+            }
+
+            const activePlayerName = data.players[data.current_idx].name;
+            const isMyTurn = (data.current_idx === myIndex);
+
+            document.getElementById("game-meta").innerHTML = `
+                <span><b>第 ${data.round} 轮</b></span> |
+                <span style="color:#ffb423;">当前行动：<b>${activePlayerName}</b></span> |
+                <span>剩余行动力：<b>${data.actions_left}</b></span> |
+                <span>基本牌堆：${data.deck_count} 张</span>
+            `;
+
+            const titleAnchor = document.getElementById("action-turn-title");
+            if (isMyTurn) {
+                titleAnchor.innerHTML = "🟢 【现在是你的出牌回合】请选择可用卡牌进行打击：";
+                titleAnchor.style.color = "#00fff0";
+            } else {
+                titleAnchor.innerHTML = `🟡 【等待中】当前轮到 ${activePlayerName} 作出行动...`;
+                titleAnchor.style.color = "#ffb423";
+            }
+
+            const oldTarget = selectedTargetIdx;
+            const anchor = document.getElementById("players-anchor");
+            anchor.innerHTML = "";
+
+            data.players.forEach(p => {
+                const isCurrentTurn = (p.idx === data.current_idx);
+                let cardClass = "player-card";
+                if (!p.alive) cardClass += " dead";
+                else if (isCurrentTurn) cardClass += " active-turn";
+                if (p.idx === oldTarget && p.alive) cardClass += " selected-target";
+
+                let hpHearts = "";
+                for(let h=0; h<p.hp; h++) hpHearts += "❤️";
+                for(let m=p.hp; m<p.max_hp; m++) hpHearts += "🖤";
+
+                anchor.innerHTML += `
+                    <div class="${cardClass}" id="pcard-${p.idx}" onclick="selectTarget(${p.idx})">
+                        <div class="p-header">
+                            <span class="p-name">${p.name} ${p.idx === myIndex ? '<span style="color:#00fff0;">(你)</span>' : ''}</span>
+                            <span class="faction-tag fac-${p.faction}">${p.faction}</span>
+                        </div>
+                        <div class="hp-bar">${hpHearts} (${p.hp}/${p.max_hp})</div>
+                        <div style="font-size:12px; color:#cbd5e1; margin-top:4px;">🎴 手牌：${p.hand_count} 张</div>
+                        <div>
+                            <span class="status-badge st-${p.status}">状态：${p.status} ${p.status_cooldown > 0 ? `(CD:${p.status_cooldown})` : ''}</span>
+                        </div>
+                    </div>
+                `;
+            });
+
+            if (data.players[oldTarget] && !data.players[oldTarget].alive) {
+                selectedTargetIdx = -1;
+            }
+
+            const handAnchor = document.getElementById("basic-hand-anchor");
+            handAnchor.innerHTML = "";
+            data.my_cards.forEach(card => {
+                if (data.my_status === "暗度陈仓" && card === "防") {
+                    handAnchor.innerHTML += `
+                        <div style="display:flex; flex-direction:column;
