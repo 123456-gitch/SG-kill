@@ -148,7 +148,6 @@ def start_turn(idx):
     if not p['alive']:
         next_turn()
         return
-    # 修复：每个玩家回合开始时，所有装备饮鸩止渴的玩家都减3上限（不是只有自己回合才减）
     for player in game.players:
         if player['alive'] and player['status'] == "饮鸩止渴":
             player['max_hp'] = max(1, player['max_hp'] - 3)
@@ -298,6 +297,7 @@ def execute_defense_response(idx, resp_type):
     card_name = game.pending_action['card']
     src_idx = game.pending_action['source_idx']
     tgt_idx = game.pending_action['target_idx']
+    was_pending = True
     if resp_type == '长城' and "长城" in p['hand']:
         p['hand'].remove("长城")
         add_log(f"🧱 机器人【{p['name']}】祭出高耸【长城壁】！完美格挡了本次针对其发动的【{card_name}】效果！")
@@ -324,6 +324,12 @@ def execute_defense_response(idx, resp_type):
             add_log(f"⏭️ 回合主行动方【{src_player['name']}】阵亡，出牌阶段强制终止。")
             next_turn()
             return
+    # 修复：荆轲刺秦无论是否被防住，结算完后使用者都要自损1血
+    if was_pending and not game.pending_action and card_name == "荆轲刺秦" and game.active:
+        src_player = game.players[src_idx]
+        if src_player['alive']:
+            damage_player(src_idx, 1, "荆轲刺秦反噬自损")
+            add_log(f"🗡️ 【{src_player['name']}】荆轲刺秦反噬：自损1点体力！")
     check_victory_conditions()
     broadcast_state()
     if game.active and game.pending_action and game.pending_action['target_idx'] == idx:
@@ -396,9 +402,6 @@ def execute_card_effect(src_idx, tgt_idx, card):
             add_log(f"🛡️ 【{tgt['name']}】卧薪尝胆被动减伤：本次受到的【荆轲刺秦】伤害减少1点！")
         if dmg > 0:
             damage_player(tgt_idx, dmg, "荆轲刺秦")
-        if src['alive']:
-            damage_player(src_idx, 1, "荆轲刺秦反噬自损")
-            add_log(f"🗡️ 【{src['name']}】荆轲刺秦反噬：自损1点体力！")
     elif card == "一字马":
         tgt['skipped'] = True
         add_log(f"🔒 【{tgt['name']}】被一字马咒术封锁！下轮行动跳过")
@@ -640,6 +643,7 @@ def on_respond_action(data):
     card_name = game.pending_action['card']
     src_idx = game.pending_action['source_idx']
     tgt_idx = game.pending_action['target_idx']
+    was_pending = True
     if resp_type == '长城' and "长城" in p['hand']:
         p['hand'].remove("长城")
         add_log(f"🧱 【{p['name']}】祭出高耸【长城壁】！完美格挡了本次针对其发动的【{card_name}】效果！")
@@ -666,6 +670,12 @@ def on_respond_action(data):
             add_log(f"⏭️ 回合主行动方【{src_player['name']}】阵亡，出牌阶段强制终止。")
             next_turn()
             return
+    # 修复：荆轲刺秦无论是否被防住，结算完后使用者都要自损1血
+    if was_pending and not game.pending_action and card_name == "荆轲刺秦" and game.active:
+        src_player = game.players[src_idx]
+        if src_player['alive']:
+            damage_player(src_idx, 1, "荆轲刺秦反噬自损")
+            add_log(f"🗡️ 【{src_player['name']}】荆轲刺秦反噬：自损1点体力！")
     check_victory_conditions()
     broadcast_state()
     if game.active and not game.pending_action:
