@@ -9,7 +9,7 @@
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         body { background: #1a1a2e; color: #e2e8f0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
         header { background: #162447; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0f4c81; }
-        h1 { font-size: 22px; color: #e43f5a; letter-spacing: 2px; text-shadow: 0 0 8px rgba(228,63,90,0.6); }
+        h1 { font-size: 22px; color: #e43f5a; letter-spacing: 2px; }
         .main-container { display: flex; flex: 1; overflow: hidden; }
         .battle-zone { flex: 3; display: flex; flex-direction: column; padding: 15px; overflow-y: auto; background: linear-gradient(180deg, #1f1f3a 0%, #161625 100%); }
         #lobby { background: #1f4068; padding: 25px; border-radius: 12px; margin: auto; max-width: 480px; width: 100%; box-shadow: 0 10px 25px rgba(0,0,0,0.5); text-align: center; }
@@ -17,7 +17,7 @@
         label { display: block; font-size: 13px; margin-bottom: 6px; color: #cbd5e1; }
         input, select { width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #0f4c81; background: #162447; color: #fff; outline: none; }
         .btn { width: 100%; padding: 12px; font-weight: bold; cursor: pointer; background: #e43f5a; border: none; border-radius: 6px; color: white; transition: 0.2s; font-size: 15px; }
-        .btn:hover { background: #ff4d6d; box-shadow: 0 0 12px rgba(228,63,90,0.5); }
+        .btn:hover { background: #ff4d6d; }
         .btn:disabled { background: #555; cursor: not-allowed; opacity: 0.6; }
         .players-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px; }
         .player-card { background: #162447; border: 3px solid #1f4068; border-radius: 10px; padding: 15px; position: relative; cursor: pointer; transition: 0.2s; }
@@ -54,7 +54,6 @@
         .card-item:disabled { background: #535c68; color: #aaa; cursor: not-allowed; transform: none; }
         .st-card-item { background: #341f97; border-color: #5f27cd; }
         .st-card-item:hover { background: #ffa502; color: #000; }
-        .st-cd-tag { font-size: 10px; color: #ff7675; margin-left: 4px; }
         .side-bar { flex: 1.3; background: #111122; border-left: 2px solid #162447; display: flex; flex-direction: column; overflow: hidden; }
         .log-container { flex: 1; padding: 12px; overflow-y: auto; font-size: 12px; font-family: monospace; background: #0d0d18; }
         .log-line { margin-bottom: 6px; border-bottom: 1px solid #161625; padding-bottom: 4px; color: #a0aec0; }
@@ -68,10 +67,11 @@
         .table-desc th { background: #1f4068; color: #ffb423; }
         #victory-modal {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0, 0, 0, 0.9); z-index: 9999; justify-content: center; align-items: center; flex-direction: column;
+            background: rgba(0, 0, 0, 0.85); z-index: 9999; justify-content: center; align-items: center;
         }
-        .victory-box { background: #1f4068; padding: 40px; border-radius: 12px; border: 3px solid #ffb423; text-align: center; max-width: 500px; width: 90%; box-shadow: 0 0 35px #ffb423; animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
-        @keyframes popIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        .victory-box { background: #1f4068; padding: 35px 40px; border-radius: 10px; border: 2px solid #ffb423; text-align: center; max-width: 450px; width: 90%; }
+        .victory-box h2 { color: #ffb423; margin-bottom: 15px; font-size: 22px; }
+        .victory-box p { color: #e2e8f0; font-size: 15px; margin-bottom: 20px; line-height: 1.6; }
         .connection-status { font-size: 12px; padding: 4px 10px; border-radius: 4px; margin-right: 10px; }
         .conn-online { background: #00b894; color: white; }
         .conn-offline { background: #e43f5a; color: white; }
@@ -145,7 +145,7 @@
                         <tr><td>长城</td><td>被动</td><td>全面免疫神技！1张可废掉整张针对你的牌。</td></tr>
                         <tr><td>回血</td><td>主动</td><td>恢复 1 点生命，不可超过上限。</td></tr>
                         <tr><td>卡牌大师</td><td>主动</td><td>强力过牌，立刻额外补充 2 张新基础手牌。</td></tr>
-                        <tr><td>荆轲刺秦</td><td>主动</td><td>暴击伤害！造成 2 点伤害，使用者自损 1 点反噬。</td></tr>
+                        <tr><td>荆轲刺秦</td><td>主动</td><td>造成 2 点伤害，对方结算后使用者自损 1 点反噬。</td></tr>
                         <tr><td>一字马</td><td>主动</td><td>强行剥夺目标下个轮次的所有行动权。</td></tr>
                         <tr><td>顺手牵羊</td><td>主动</td><td>强行摸走目标 1 张手牌。</td></tr>
                         <tr><td>江山易主</td><td>主动</td><td>将自己全部手牌与目标大对调。</td></tr>
@@ -155,7 +155,7 @@
                 <div class="rules-section">
                     <div class="rules-sub">四、状态卡牌觉醒词条</div>
                     <div class="rules-text">▪ <b>【背水一战】</b>：上限重置为5。轮到自己时可献祭 X 点血，暴抽 X+1 张。</div>
-                    <div class="rules-text">▪ <b>【饮鸩止渴】</b>：血量与上限瞬间撑爆至 10！每回合开始毒发，上限减3。</div>
+                    <div class="rules-text">▪ <b>【饮鸩止渴】</b>：血量与上限瞬间撑爆至 10！<b>每回合开始毒发，上限-3（最低为1）</b>。</div>
                     <div class="rules-text">▪ <b>【卧薪尝胆】</b>：上限5。自带减伤（受攻降为0，受刺秦降为1），打非回血手牌受1点反噬。</div>
                     <div class="rules-text">▪ <b>【暗度陈仓】</b>：上限5。出牌时可将防当攻打；防守时可将攻当防打。</div>
                 </div>
@@ -180,8 +180,8 @@
     <div id="victory-modal">
         <div class="victory-box">
             <h2 id="victory-title">🏆 决战落幕 🏆</h2>
-            <p id="victory-msg" style="font-size: 16px; color: #fff; margin: 20px 0; line-height: 1.6;"></p>
-            <button class="btn" onclick="resetGame()" style="background: #e43f5a; max-width: 200px; margin: 0 auto; display: block;">重新回大厅</button>
+            <p id="victory-msg"></p>
+            <button class="btn" onclick="resetGame()" style="max-width: 180px; margin: 0 auto; display: block;">返回大厅</button>
         </div>
     </div>
     <script>
