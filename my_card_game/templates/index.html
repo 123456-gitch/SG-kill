@@ -19,6 +19,13 @@
         .btn { width: 100%; padding: 12px; font-weight: bold; cursor: pointer; background: #e43f5a; border: none; border-radius: 6px; color: white; transition: 0.2s; font-size: 15px; }
         .btn:hover { background: #ff4d6d; }
         .btn:disabled { background: #555; cursor: not-allowed; opacity: 0.6; }
+        .btn-rules {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none; padding: 8px 16px; border-radius: 6px; color: white;
+            cursor: pointer; font-weight: bold; font-size: 13px; margin-right: 10px;
+            box-shadow: 0 2px 10px rgba(102, 126, 234, 0.4); transition: 0.2s;
+        }
+        .btn-rules:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(102, 126, 234, 0.6); }
         .players-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px; }
         .player-card { background: #162447; border: 3px solid #1f4068; border-radius: 10px; padding: 15px; position: relative; cursor: pointer; transition: 0.2s; }
         .player-card.selected-target { border: 4px solid #ff0000 !important; box-shadow: 0 0 25px #ff0000 !important; transform: scale(1.02); }
@@ -44,15 +51,15 @@
         .prompt-btns { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
         .btn-action { padding: 8px 16px; font-weight: bold; background: #162447; border: 1px solid #0f4c81; color: white; border-radius: 4px; cursor: pointer; transition: 0.1s; }
         .btn-action:hover { background: #e43f5a; }
-        .my-zone { background: #162447; border-top: 3px solid #0f4c81; padding: 20px 25px; min-height: 180px; }
+        .my-zone { background: #162447; border-top: 3px solid #0f4c81; padding: 20px 25px; min-height: 280px; }
         .zone-layout { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; }
         .hand-wrapper { flex: 1; }
         .section-title { font-size: 14px; color: #00fff0; font-weight: bold; margin-bottom: 12px; }
-        .cards-list { display: flex; gap: 12px; flex-wrap: wrap; }
+        .cards-list { display: flex; gap: 14px; flex-wrap: wrap; }
         .card-item {
-            background: #1f4068; border: 1px solid #0f4c81; padding: 14px 20px;
-            border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 16px;
-            min-width: 100px; text-align: center; color: white; transition: 0.2s;
+            background: #1f4068; border: 1px solid #0f4c81; padding: 16px 22px;
+            border-radius: 10px; cursor: pointer; font-weight: bold; font-size: 17px;
+            min-width: 110px; text-align: center; color: white; transition: 0.2s;
         }
         .card-item:hover { background: #00fff0; color: #1a1a2e; transform: translateY(-3px); }
         .card-item:disabled { background: #535c68; color: #aaa; cursor: not-allowed; transform: none; }
@@ -61,14 +68,27 @@
         .side-bar { flex: 1.3; background: #111122; border-left: 2px solid #162447; display: flex; flex-direction: column; overflow: hidden; }
         .log-container { flex: 1; padding: 12px; overflow-y: auto; font-size: 12px; font-family: monospace; background: #0d0d18; }
         .log-line { margin-bottom: 6px; border-bottom: 1px solid #161625; padding-bottom: 4px; color: #a0aec0; }
-        .rules-container { flex: 1.4; padding: 15px; overflow-y: auto; font-size: 12px; background: #16162a; border-top: 1px solid #1f4068; }
-        .rules-title { font-size: 14px; font-weight: bold; color: #ffb423; margin-bottom: 10px; border-bottom: 1px solid #ffb423; padding-bottom: 4px; text-align: center; }
-        .rules-section { margin-bottom: 12px; }
-        .rules-sub { font-weight: bold; color: #00fff0; margin-bottom: 4px; }
-        .rules-text { color: #cbd5e1; line-height: 1.5; }
-        .table-desc { width: 100%; border-collapse: collapse; margin-top: 5px; }
-        .table-desc th, .table-desc td { padding: 4px; border: 1px solid #1f4068; text-align: left; font-size: 11px; }
-        .table-desc th { background: #1f4068; color: #ffb423; }
+        #rules-modal {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.85); z-index: 9998; justify-content: center; align-items: center;
+        }
+        .rules-box {
+            background: #162447; padding: 30px 35px; border-radius: 15px; border: 3px solid #00fff0;
+            box-shadow: 0 0 40px rgba(0, 255, 240, 0.4);
+            max-width: 700px; width: 90%; max-height: 85vh; overflow-y: auto;
+        }
+        .rules-box h2 { color: #00fff0; margin-bottom: 20px; text-align: center; font-size: 22px; }
+        .rules-close-btn {
+            position: absolute; top: 20px; right: 25px; background: none; border: none;
+            color: #fff; font-size: 28px; cursor: pointer; opacity: 0.7;
+        }
+        .rules-close-btn:hover { opacity: 1; }
+        .rules-modal-section { margin-bottom: 18px; }
+        .rules-modal-sub { font-weight: bold; color: #ffb423; margin-bottom: 6px; font-size: 15px; }
+        .rules-modal-text { color: #cbd5e1; line-height: 1.6; font-size: 13px; }
+        .rules-modal-table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+        .rules-modal-table th, .rules-modal-table td { padding: 6px 8px; border: 1px solid #1f4068; text-align: left; font-size: 12px; }
+        .rules-modal-table th { background: #1f4068; color: #ffb423; }
         #victory-modal {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0, 0, 0, 0.85); z-index: 9999; justify-content: center; align-items: center;
@@ -102,6 +122,7 @@
     <header>
         <h1>三国kill ⚔️ 真人联机/AI对抗端</h1>
         <div style="display: flex; align-items: center;">
+            <button class="btn-rules" onclick="toggleRules()">📜 规则图鉴</button>
             <span id="conn-status" class="connection-status conn-connecting">连接中...</span>
             <div id="game-meta" style="font-size: 13px; color: #cbd5e1; margin-right: 15px;">大厅集结中...</div>
             <button class="btn" style="width:auto; padding:5px 12px; font-size:12px;" onclick="resetGame()">暴力重置房间</button>
@@ -137,48 +158,6 @@
         </div>
         <div class="side-bar">
             <div class="log-container" id="log-box"></div>
-            <div class="rules-container">
-                <div class="rules-title">📜 游戏机制与全卡牌规则图鉴</div>
-                <div class="rules-section">
-                    <div class="rules-sub">一、阵营与终极胜负法则</div>
-                    <div class="rules-text">▪ <b>【司】(叛逆者)</b>：独立作战，胜利条件为：<b>击杀【冀】</b>。</div>
-                    <div class="rules-text">▪ <b>【冀】(主星)</b>：与丁同盟，胜利条件为：<b>联合击杀【司】</b>。</div>
-                    <div class="rules-text">▪ <b>【丁】(护卫)</b>：守护神。血量首次归零时<b>原地复活</b>（回满体力并抽3张牌），并<b>向全场强制公开所有人的真实身份</b>！</div>
-                    <div class="rules-text" style="color: #ff4d6d; font-weight: bold; margin-top: 4px; border-left: 2px solid #ff4d6d; padding-left: 6px;">
-                        🌟 【特别觉醒规则】当【丁】死亡并原地复活致使全场身份公开时，作为对抗惩罚，【司】(叛逆者) 将瞬间强制无条件获得 10 张基本手牌！
-                    </div>
-                </div>
-                <div class="rules-section">
-                    <div class="rules-sub">二、行动力与回合规则</div>
-                    <div class="rules-text">▪ <b>第X轮 = X+1行动力</b>：第1轮2点，第2轮3点，以此类推</div>
-                    <div class="rules-text">▪ <b>3玩家 = 1轮</b>：3个存活玩家各出完牌为1轮，1个玩家出牌为1回合</div>
-                    <div class="rules-text">▪ <b>新一轮开始补牌</b>：每轮开始时所有玩家自动补手牌至5张</div>
-                    <div class="rules-text">▪ <b>行动力耗尽强制结束</b>：行动力用完必须结束回合</div>
-                </div>
-                <div class="rules-section">
-                    <div class="rules-sub">三、核心基础卡牌数据库（共200张）</div>
-                    <table class="table-desc">
-                        <tr><th>牌名</th><th>类型</th><th>效果说明 (每次耗1行动力)</th></tr>
-                        <tr><td>攻</td><td>主动</td><td>对目标造成 1 点伤害，可被【防/长城】抵挡。</td></tr>
-                        <tr><td>防</td><td>被动</td><td>防守绝技。只能响应【攻】或【荆轲刺秦】。</td></tr>
-                        <tr><td>长城</td><td>被动</td><td>全面免疫神技！1张可废掉整张针对你的牌。</td></tr>
-                        <tr><td>回血</td><td>主动</td><td>恢复 1 点生命，不可超过上限。</td></tr>
-                        <tr><td>卡牌大师</td><td>主动</td><td>强力过牌，立刻额外补充 2 张新基础手牌。</td></tr>
-                        <tr><td>荆轲刺秦</td><td>主动</td><td>造成 2 点伤害，对方结算后使用者自损 1 点反噬。</td></tr>
-                        <tr><td>一字马</td><td>主动</td><td>强行剥夺目标下个轮次的所有行动权。</td></tr>
-                        <tr><td>顺手牵羊</td><td>主动</td><td>强行摸走目标 1 张手牌。</td></tr>
-                        <tr><td>江山易主</td><td>主动</td><td>将自己全部手牌与目标大对调。</td></tr>
-                        <tr><td>同归于尽</td><td>主动</td><td>自爆袭击，让彼此强制扣减 1 点体力。</td></tr>
-                    </table>
-                </div>
-                <div class="rules-section">
-                    <div class="rules-sub">四、状态卡牌觉醒词条</div>
-                    <div class="rules-text">▪ <b>【背水一战】</b>：上限重置为5。轮到自己时可献祭 X 点血，暴抽 X+1 张。</div>
-                    <div class="rules-text">▪ <b>【饮鸩止渴】</b>：血量与上限瞬间撑爆至 10！<b>每回合开始毒发，上限-3（最低为1）</b>。</div>
-                    <div class="rules-text">▪ <b>【卧薪尝胆】</b>：上限5。自带减伤（受攻降为0，受刺秦降为1），打非回血手牌受1点反噬。</div>
-                    <div class="rules-text">▪ <b>【暗度陈仓】</b>：上限5。出牌时可将防当攻打；防守时可将攻当防打。</div>
-                </div>
-            </div>
         </div>
     </div>
     <div class="my-zone" id="player-interaction" style="display: none;">
@@ -187,12 +166,57 @@
                 <div class="section-title" id="action-turn-title">🎮 战斗状态指示</div>
                 <div class="cards-list" id="basic-hand-anchor"></div>
             </div>
-            <div class="hand-wrapper" style="max-width: 300px;">
+            <div class="hand-wrapper" style="max-width: 320px;">
                 <div class="section-title">⚡ 状态装备牌栏 (点击装备/更换)</div>
                 <div class="cards-list" id="status-hand-anchor"></div>
             </div>
             <div style="display: flex; align-items: center; height: 100%;">
-                <button class="btn" style="background:#00b894; padding:18px 30px; font-size: 16px; white-space: nowrap;" onclick="endTurn()">结束我的出牌回合</button>
+                <button class="btn" style="background:#00b894; padding:20px 32px; font-size: 17px; white-space: nowrap;" onclick="endTurn()">结束我的出牌回合</button>
+            </div>
+        </div>
+    </div>
+    <div id="rules-modal">
+        <div class="rules-box" style="position: relative;">
+            <button class="rules-close-btn" onclick="toggleRules()">×</button>
+            <h2>📜 游戏机制与全卡牌规则图鉴</h2>
+            <div class="rules-modal-section">
+                <div class="rules-modal-sub">一、阵营与终极胜负法则</div>
+                <div class="rules-modal-text">▪ <b>【司】(叛逆者)</b>：独立作战，胜利条件为：<b>击杀【冀】</b>。</div>
+                <div class="rules-modal-text">▪ <b>【冀】(主星)</b>：与丁同盟，胜利条件为：<b>联合击杀【司】</b>。</div>
+                <div class="rules-modal-text">▪ <b>【丁】(护卫)</b>：守护神。血量首次归零时<b>原地复活</b>（回满体力并抽3张牌），并<b>向全场强制公开所有人的真实身份</b>！</div>
+                <div class="rules-modal-text" style="color: #ff4d6d; font-weight: bold; margin-top: 6px; border-left: 2px solid #ff4d6d; padding-left: 8px;">
+                    🌟 【特别觉醒规则】当【丁】死亡并原地复活致使全场身份公开时，作为对抗惩罚，【司】(叛逆者) 将瞬间强制无条件获得 10 张基本手牌！
+                </div>
+            </div>
+            <div class="rules-modal-section">
+                <div class="rules-modal-sub">二、行动力与回合规则</div>
+                <div class="rules-modal-text">▪ <b>第X轮 = X+1行动力</b>：第1轮2点，第2轮3点，以此类推</div>
+                <div class="rules-modal-text">▪ <b>3玩家 = 1轮</b>：3个存活玩家各出完牌为1轮，1个玩家出牌为1回合</div>
+                <div class="rules-modal-text">▪ <b>新一轮开始补牌</b>：每轮开始时所有玩家自动补手牌至5张</div>
+                <div class="rules-modal-text">▪ <b>行动力耗尽强制结束</b>：行动力用完必须结束回合</div>
+            </div>
+            <div class="rules-modal-section">
+                <div class="rules-modal-sub">三、核心基础卡牌数据库（共200张）</div>
+                <table class="rules-modal-table">
+                    <tr><th>牌名</th><th>类型</th><th>效果说明 (每次耗1行动力)</th></tr>
+                    <tr><td>攻</td><td>主动</td><td>对目标造成 1 点伤害，可被【防/长城】抵挡。</td></tr>
+                    <tr><td>防</td><td>被动</td><td>防守绝技。只能响应【攻】或【荆轲刺秦】。</td></tr>
+                    <tr><td>长城</td><td>被动</td><td>全面免疫神技！1张可废掉整张针对你的牌。</td></tr>
+                    <tr><td>回血</td><td>主动</td><td>恢复 1 点生命，不可超过上限。</td></tr>
+                    <tr><td>卡牌大师</td><td>主动</td><td>强力过牌，立刻额外补充 2 张新基础手牌。</td></tr>
+                    <tr><td>荆轲刺秦</td><td>主动</td><td>造成 2 点伤害，对方结算后使用者自损 1 点反噬。</td></tr>
+                    <tr><td>一字马</td><td>主动</td><td>强行剥夺目标下个轮次的所有行动权。</td></tr>
+                    <tr><td>顺手牵羊</td><td>主动</td><td>强行摸走目标 1 张手牌。</td></tr>
+                    <tr><td>江山易主</td><td>主动</td><td>将自己全部手牌与目标大对调。</td></tr>
+                    <tr><td>同归于尽</td><td>主动</td><td>自爆袭击，让彼此强制扣减 1 点体力。</td></tr>
+                </table>
+            </div>
+            <div class="rules-modal-section">
+                <div class="rules-modal-sub">四、状态卡牌觉醒词条</div>
+                <div class="rules-modal-text">▪ <b>【背水一战】</b>：上限重置为5。轮到自己时可献祭 X 点血，暴抽 X+1 张。</div>
+                <div class="rules-modal-text">▪ <b>【饮鸩止渴】</b>：血量与上限瞬间撑爆至 10！<b>每回合开始毒发，上限-3（最低为1）</b>。</div>
+                <div class="rules-modal-text">▪ <b>【卧薪尝胆】</b>：上限5。自带减伤（受攻降为0，受刺秦降为1），打非回血手牌受1点反噬。</div>
+                <div class="rules-modal-text">▪ <b>【暗度陈仓】</b>：上限5。出牌时可将防当攻打；防守时可将攻当防打。</div>
             </div>
         </div>
     </div>
@@ -213,6 +237,15 @@
         let currentStatusCooldown = 0;
         let gameState = null;
         let isConnected = false;
+
+        function toggleRules() {
+            const modal = document.getElementById('rules-modal');
+            if (modal.style.display === 'flex') {
+                modal.style.display = 'none';
+            } else {
+                modal.style.display = 'flex';
+            }
+        }
 
         function updateConnStatus(status, text) {
             const statusEl = document.getElementById('conn-status');
@@ -396,7 +429,7 @@
                 if (card === "防" && data.my_status === "暗度陈仓" && canPlay) {
                     btn = `<div style="display:flex; flex-direction:column; gap:2px;">
                         <button class="card-item" onclick="playCard('${card}')" disabled>${card}</button>
-                        <button class="card-item" style="background:#e1b12c; color:#000; font-size:12px; padding:6px;" onclick="playAnduxu('防', '攻')">当攻打</button>
+                        <button class="card-item" style="background:#e1b12c; color:#000; font-size:13px; padding:8px;" onclick="playAnduxu('防', '攻')">当攻打</button>
                     </div>`;
                 }
                 handAnchor.innerHTML += btn;
