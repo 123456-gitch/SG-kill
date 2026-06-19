@@ -7,7 +7,7 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'sg_kill_human_perfect_edition_2026_with_bots'
 
 # 显式允许所有来源，确保跨域没问题
-socketio = SocketIO(app, cors_allowed_origins="*", logger=False, engineio_logger=False)
+socketio = SocketIO(app, cors_allowed_origins="*", logger=False, engineio_logger=False,async_mode='gevent')
 
 # 共有200张核心牌配比
 BASIC_CARDS = (
