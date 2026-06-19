@@ -148,16 +148,18 @@ def start_turn(idx):
     if not p['alive']:
         next_turn()
         return
+    # 修复：每个玩家回合开始时，所有装备饮鸩止渴的玩家都减3上限（不是只有自己回合才减）
+    for player in game.players:
+        if player['alive'] and player['status'] == "饮鸩止渴":
+            player['max_hp'] = max(1, player['max_hp'] - 3)
+            force_hp_limit(player)
+            add_log(f"🧪 【{player['name']}】饮鸩止渴毒发：上限-3 → 当前 {player['hp']}/{player['max_hp']}")
     game.current_idx = idx
     game.actions_left = game.round + 1
     p['beishui_decided'] = False
     all_status = list(STATUS_CARDS)
     random.shuffle(all_status)
     p['status_cards'] = all_status[:2]
-    if p['status'] == "饮鸩止渴":
-        p['max_hp'] = max(1, p['max_hp'] - 3)
-        force_hp_limit(p)
-        add_log(f"🧪 【{p['name']}】饮鸩止渴毒发：上限-3 → 当前 {p['hp']}/{p['max_hp']}")
     if p.get('skipped', False):
         p['skipped'] = False
         add_log(f"⏰ 【{p['name']}】身上【一字马】咒术生效，跳过本回合行动权！")
@@ -206,7 +208,6 @@ def trigger_bot_if_needed():
         socketio.start_background_task(run_bot_turn, game.current_idx)
 
 def check_actions_and_end_turn():
-    """结算完后检查：如果行动力耗尽则自动结束回合，否则触发机器人"""
     if not game.active or game.pending_action: return
     if game.actions_left <= 0:
         add_log(f"⚠️ 【{game.players[game.current_idx]['name']}】行动力耗尽！")
@@ -364,7 +365,6 @@ def execute_play_card(src_idx, card_to_spend, card_to_execute, tgt_idx):
         add_log(f"⏭️ 回合主行动方【{src['name']}】阵亡，出牌阶段强制终止。")
         next_turn()
         return True
-    # 修改：有待结算时不立即结束回合，等结算完再检查
     if game.actions_left <= 0 and not game.pending_action:
         add_log(f"⚠️ 【{src['name']}】行动力耗尽！")
         end_turn_logic()
@@ -390,14 +390,12 @@ def execute_card_effect(src_idx, tgt_idx, card):
         if dmg > 0:
             damage_player(tgt_idx, dmg, "攻")
     elif card == "荆轲刺秦":
-        # 伤害=剩余需要的防御层数
         dmg = game.pending_action['required_defenses'] if game.pending_action else 2
         if tgt['status'] == "卧薪尝胆":
             dmg = max(0, dmg - 1)
             add_log(f"🛡️ 【{tgt['name']}】卧薪尝胆被动减伤：本次受到的【荆轲刺秦】伤害减少1点！")
         if dmg > 0:
             damage_player(tgt_idx, dmg, "荆轲刺秦")
-        # 修改：荆轲刺秦反噬在对方结算完伤害后再扣
         if src['alive']:
             damage_player(src_idx, 1, "荆轲刺秦反噬自损")
             add_log(f"🗡️ 【{src['name']}】荆轲刺秦反噬：自损1点体力！")
