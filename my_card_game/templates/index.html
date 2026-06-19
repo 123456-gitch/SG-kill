@@ -44,12 +44,16 @@
         .prompt-btns { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
         .btn-action { padding: 8px 16px; font-weight: bold; background: #162447; border: 1px solid #0f4c81; color: white; border-radius: 4px; cursor: pointer; transition: 0.1s; }
         .btn-action:hover { background: #e43f5a; }
-        .my-zone { background: #162447; border-top: 3px solid #0f4c81; padding: 15px; }
-        .zone-layout { display: flex; justify-content: space-between; align-items: center; }
-        .hand-wrapper { flex: 1; margin-right: 20px; }
-        .section-title { font-size: 13px; color: #00fff0; font-weight: bold; margin-bottom: 8px; }
-        .cards-list { display: flex; gap: 10px; flex-wrap: wrap; }
-        .card-item { background: #1f4068; border: 1px solid #0f4c81; padding: 10px 14px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 14px; min-width: 80px; text-align: center; color: white; transition: 0.2s; }
+        .my-zone { background: #162447; border-top: 3px solid #0f4c81; padding: 20px 25px; min-height: 180px; }
+        .zone-layout { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; }
+        .hand-wrapper { flex: 1; }
+        .section-title { font-size: 14px; color: #00fff0; font-weight: bold; margin-bottom: 12px; }
+        .cards-list { display: flex; gap: 12px; flex-wrap: wrap; }
+        .card-item {
+            background: #1f4068; border: 1px solid #0f4c81; padding: 14px 20px;
+            border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 16px;
+            min-width: 100px; text-align: center; color: white; transition: 0.2s;
+        }
         .card-item:hover { background: #00fff0; color: #1a1a2e; transform: translateY(-3px); }
         .card-item:disabled { background: #535c68; color: #aaa; cursor: not-allowed; transform: none; }
         .st-card-item { background: #341f97; border-color: #5f27cd; }
@@ -183,12 +187,12 @@
                 <div class="section-title" id="action-turn-title">🎮 战斗状态指示</div>
                 <div class="cards-list" id="basic-hand-anchor"></div>
             </div>
-            <div class="hand-wrapper" style="max-width: 260px;">
+            <div class="hand-wrapper" style="max-width: 300px;">
                 <div class="section-title">⚡ 状态装备牌栏 (点击装备/更换)</div>
                 <div class="cards-list" id="status-hand-anchor"></div>
             </div>
-            <div>
-                <button class="btn" style="background:#00b894; padding:15px 25px;" onclick="endTurn()">结束我的出牌回合</button>
+            <div style="display: flex; align-items: center; height: 100%;">
+                <button class="btn" style="background:#00b894; padding:18px 30px; font-size: 16px; white-space: nowrap;" onclick="endTurn()">结束我的出牌回合</button>
             </div>
         </div>
     </div>
@@ -392,7 +396,7 @@
                 if (card === "防" && data.my_status === "暗度陈仓" && canPlay) {
                     btn = `<div style="display:flex; flex-direction:column; gap:2px;">
                         <button class="card-item" onclick="playCard('${card}')" disabled>${card}</button>
-                        <button class="card-item" style="background:#e1b12c; color:#000; font-size:10px; padding:4px;" onclick="playAnduxu('防', '攻')">当攻打</button>
+                        <button class="card-item" style="background:#e1b12c; color:#000; font-size:12px; padding:6px;" onclick="playAnduxu('防', '攻')">当攻打</button>
                     </div>`;
                 }
                 handAnchor.innerHTML += btn;
