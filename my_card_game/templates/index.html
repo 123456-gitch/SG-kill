@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>三国kill - 真人博弈与AI决战端</title>
+    <title>三国kill</title>
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
@@ -131,7 +131,7 @@
 </head>
 <body>
     <header>
-        <h1>三国kill ⚔️ 真人联机/AI对抗端</h1>
+        <h1>三国kill</h1>
         <div style="display: flex; align-items: center;">
             <button class="btn-rules" onclick="toggleRules()">📜 规则图鉴</button>
             <span id="conn-status" class="connection-status conn-connecting">连接中...</span>
@@ -152,7 +152,7 @@
                     <label>人机数量配置：</label>
                     <select id="bot-select" onchange="changeBotCount()">
                         <option value="2" selected>补满 2 个人机 (单人速开)</option>
-                        <option value="1">补满 1 个人机 (双人配合)</option>
+                        <option value="1">补满 1 个人机 (双人畅玩)</option>
                         <option value="0">不要人机 (纯真人博弈)</option>
                     </select>
                 </div>
@@ -192,11 +192,11 @@
             <h2>📜 游戏机制与全卡牌规则图鉴</h2>
             <div class="rules-modal-section">
                 <div class="rules-modal-sub">一、阵营与终极胜负法则</div>
-                <div class="rules-modal-text">▪ <b>【司】(叛逆者)</b>：独立作战，胜利条件为：<b>击杀【冀】</b>。</div>
-                <div class="rules-modal-text">▪ <b>【冀】(主星)</b>：与丁同盟，胜利条件为：<b>联合击杀【司】</b>。</div>
-                <div class="rules-modal-text">▪ <b>【丁】(护卫)</b>：守护神。血量首次归零时<b>原地复活</b>（回满体力并抽3张牌），并<b>向全场强制公开所有人的真实身份</b>！</div>
+                <div class="rules-modal-text">▪ <b>【司】</b>：独立作战，胜利条件为：<b>击杀【冀】</b>。</div>
+                <div class="rules-modal-text">▪ <b>【冀】</b>：与丁同盟，胜利条件为：<b>联合击杀【司】</b>。</div>
+                <div class="rules-modal-text">▪ <b>【丁】</b>：守护神。血量首次归零时<b>原地复活</b>（回满体力并抽3张牌），并<b>向全场强制公开所有人的真实身份</b>！</div>
                 <div class="rules-modal-text" style="color: #ff4d6d; font-weight: bold; margin-top: 6px; border-left: 2px solid #ff4d6d; padding-left: 8px;">
-                    🌟 【特别觉醒规则】当【丁】死亡并原地复活致使全场身份公开时，作为对抗惩罚，【司】(叛逆者) 将瞬间强制无条件获得 10 张基本手牌！
+                    🌟 【特别觉醒规则】当【丁】死亡并原地复活致使全场身份公开时，作为对抗惩罚，【司】将瞬间强制无条件获得 10 张基本手牌！
                 </div>
             </div>
             <div class="rules-modal-section">
@@ -212,10 +212,10 @@
                     <tr><th>牌名</th><th>类型</th><th>效果说明 (每次耗1行动力)</th></tr>
                     <tr><td>攻</td><td>主动</td><td>对目标造成 1 点伤害，可被【防/长城】抵挡。</td></tr>
                     <tr><td>防</td><td>被动</td><td>防守绝技。只能响应【攻】或【荆轲刺秦】。</td></tr>
-                    <tr><td>长城</td><td>被动</td><td>全面免疫神技！1张可废掉整张针对你的牌。</td></tr>
+                    <tr><td>长城</td><td>被动</td><td>全面免疫神技！1张便可废掉针对你的牌。</td></tr>
                     <tr><td>回血</td><td>主动</td><td>恢复 1 点生命，不可超过上限。</td></tr>
                     <tr><td>卡牌大师</td><td>主动</td><td>强力过牌，立刻额外补充 2 张新基础手牌。</td></tr>
-                    <tr><td>荆轲刺秦</td><td>主动</td><td>造成 2 点伤害，对方结算后使用者自损 1 点反噬。</td></tr>
+                    <tr><td>荆轲刺秦</td><td>主动</td><td>造成 2 点伤害，对方结算后使用者受到 1 点反噬。</td></tr>
                     <tr><td>一字马</td><td>主动</td><td>强行剥夺目标下个轮次的所有行动权。</td></tr>
                     <tr><td>顺手牵羊</td><td>主动</td><td>强行摸走目标 1 张手牌。</td></tr>
                     <tr><td>江山易主</td><td>主动</td><td>将自己全部手牌与目标大对调。</td></tr>
@@ -224,7 +224,7 @@
             </div>
             <div class="rules-modal-section">
                 <div class="rules-modal-sub">四、状态卡牌觉醒词条</div>
-                <div class="rules-modal-text">▪ <b>【背水一战】</b>：上限重置为5。轮到自己时可献祭 X 点血（x小于等于3），暴抽 X+1 张。</div>
+                <div class="rules-modal-text">▪ <b>【背水一战】</b>：上限重置为5。轮到自己时可献祭 X 点血（X小于等于3），暴抽 X+1 张。</div>
                 <div class="rules-modal-text">▪ <b>【饮鸩止渴】</b>：血量与上限瞬间撑爆至 10！<b>每回合开始毒发，上限-3（最低为1）</b>。</div>
                 <div class="rules-modal-text">▪ <b>【卧薪尝胆】</b>：上限5。自带减伤（受攻降为0，受刺秦降为1），打非回血手牌受1点反噬。</div>
                 <div class="rules-modal-text">▪ <b>【暗度陈仓】</b>：上限5。出牌时可将防当攻打；防守时可将攻当防打。</div>
