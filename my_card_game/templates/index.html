@@ -552,24 +552,34 @@
             border-color: #ffb423;
             background: linear-gradient(135deg, #5c4a1f, #3d3214);
         }
+
+        /* 暗度陈仓：防牌下面的攻按钮 - 一直显示 */
+        .hand-card.anduxu-card {
+            padding-bottom: 52px;
+        }
         .hand-card .anduxu-btn {
             position: absolute;
-            bottom: -8px;
+            bottom: 10px;
             left: 50%;
             transform: translateX(-50%);
-            font-size: 13px;
-            padding: 4px 8px;
-            background: linear-gradient(135deg, #ffb423, #ff8800);
-            border: none;
-            border-radius: 4px;
-            color: #000;
+            font-size: 15px;
+            padding: 6px 16px;
+            background: linear-gradient(135deg, #ff6b6b, #ee5a52);
+            border: 2px solid #ff4444;
+            border-radius: 6px;
+            color: #fff;
             cursor: pointer;
             white-space: nowrap;
-            display: none;
-        }
-        .hand-card:hover .anduxu-btn {
+            font-weight: bold;
+            box-shadow: 0 2px 8px rgba(255, 107, 107, 0.4);
             display: block;
+            transition: 0.2s;
         }
+        .hand-card .anduxu-btn:hover {
+            transform: translateX(-50%) scale(1.08);
+            box-shadow: 0 4px 14px rgba(255, 107, 107, 0.7);
+        }
+
         .hand-card.disabled {
             opacity: 0.4;
             cursor: not-allowed;
@@ -1132,6 +1142,10 @@
                 const canPlay = !isPassive || (myStatus === '暗度陈仓' && card === '防');
                 if (!canPlay) cardClass += ' disabled';
 
+                // 暗度陈仓的防牌：加特殊class，给攻按钮留空间
+                const isAnduxu = (myStatus === '暗度陈仓' && card === '防' && gameState.current_idx === myIndex);
+                if (isAnduxu) cardClass += ' anduxu-card';
+
                 cardEl.className = cardClass;
                 cardEl.textContent = card;
 
@@ -1139,11 +1153,11 @@
                     cardEl.onclick = () => playCard(card);
                 }
 
-                // 暗度陈仓：防可以当攻打
-                if (myStatus === '暗度陈仓' && card === '防' && gameState.current_idx === myIndex) {
+                // 暗度陈仓：防可以当攻打（按钮一直显示）
+                if (isAnduxu) {
                     const anduxuBtn = document.createElement('button');
                     anduxuBtn.className = 'anduxu-btn';
-                    anduxuBtn.textContent = '当攻打';
+                    anduxuBtn.textContent = '攻';
                     anduxuBtn.onclick = (e) => {
                         e.stopPropagation();
                         playAnduxu(card, '攻');
