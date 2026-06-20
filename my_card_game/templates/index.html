@@ -3,59 +3,468 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>三国kill</title>
+    <title>三国Kill - 三人身份局</title>
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        body { background: #1a1a2e; color: #e2e8f0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
-        header { background: #162447; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0f4c81; }
-        h1 { font-size: 22px; color: #e43f5a; letter-spacing: 2px; }
-        .main-container { display: flex; flex: 1; overflow: hidden; }
-        .battle-zone { flex: 3; display: flex; flex-direction: column; padding: 15px; overflow-y: auto; background: linear-gradient(180deg, #1f1f3a 0%, #161625 100%); }
-        #lobby { background: #1f4068; padding: 25px; border-radius: 12px; margin: auto; max-width: 480px; width: 100%; box-shadow: 0 10px 25px rgba(0,0,0,0.5); text-align: center; }
-        .form-group { margin-bottom: 15px; text-align: left; }
-        label { display: block; font-size: 13px; margin-bottom: 6px; color: #cbd5e1; }
-        input, select { width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #0f4c81; background: #162447; color: #fff; outline: none; }
-        .btn { width: 100%; padding: 12px; font-weight: bold; cursor: pointer; background: #e43f5a; border: none; border-radius: 6px; color: white; transition: 0.2s; font-size: 15px; }
-        .btn:hover { background: #ff4d6d; }
-        .btn:disabled { background: #555; cursor: not-allowed; opacity: 0.6; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+            background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+            color: #fff;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        /* 顶部导航栏 */
+        .top-bar {
+            height: 60px;
+            background: rgba(0, 0, 0, 0.4);
+            border-bottom: 2px solid #00fff0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            box-shadow: 0 2px 20px rgba(0, 255, 240, 0.3);
+        }
+        .top-bar h1 {
+            font-size: 22px;
+            color: #ffb423;
+            text-shadow: 0 0 10px rgba(255, 180, 35, 0.6);
+            letter-spacing: 2px;
+        }
+        .top-bar .left-group {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .top-bar .right-group {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .conn-status {
+            font-size: 13px;
+            padding: 4px 10px;
+            border-radius: 4px;
+            background: rgba(0, 255, 240, 0.15);
+            border: 1px solid #00fff0;
+        }
+        .conn-status.connected { color: #00ff88; border-color: #00ff88; background: rgba(0, 255, 136, 0.1); }
+        .conn-status.disconnected { color: #ff4444; border-color: #ff4444; background: rgba(255, 68, 68, 0.1); }
+        .game-meta {
+            font-size: 13px;
+            color: #aaa;
+        }
+        .game-meta span {
+            color: #ffb423;
+            font-weight: bold;
+            margin: 0 4px;
+        }
         .btn-rules {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border: none; padding: 8px 16px; border-radius: 6px; color: white;
-            cursor: pointer; font-weight: bold; font-size: 13px; margin-right: 10px;
-            box-shadow: 0 2px 10px rgba(102, 126, 234, 0.4); transition: 0.2s;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            color: white;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 13px;
+            box-shadow: 0 2px 10px rgba(102, 126, 234, 0.4);
+            transition: 0.2s;
         }
-        .btn-rules:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(102, 126, 234, 0.6); }
-        .players-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px; }
-        .player-card { background: #162447; border: 3px solid #1f4068; border-radius: 10px; padding: 15px; position: relative; cursor: pointer; transition: 0.2s; }
-        .player-card.selected-target { border: 4px solid #ff0000 !important; box-shadow: 0 0 25px #ff0000 !important; transform: scale(1.02); }
-        .player-card.selected-target::after { content: "🎯 已锁敌"; position: absolute; top: -12px; left: 50%; transform: translateX(-50%); background: #ff0000; color: white; padding: 2px 6px; font-size: 11px; font-weight: bold; border-radius: 4px; }
-        .player-card.active-turn { border-color: #ffb423 !important; background: #223663; }
-        .player-card.dead { background: #2d2d3a !important; border-color: #4a4a5a !important; opacity: 0.6; cursor: not-allowed; }
-        .p-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; border-bottom: 1px solid #1f4068; padding-bottom: 5px; }
-        .p-name { font-weight: bold; color: #fff; font-size: 15px; }
-        .faction-tag { padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: bold; }
-        .fac-隐藏 { background: #4a5568; color: #cbd5e1; }
-        .fac-司 { background: #d63031; color: white; }
-        .fac-丁 { background: #00b894; color: white; }
-        .fac-冀 { background: #0984e3; color: white; }
-        .status-badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: bold; margin-top: 5px; }
-        .st-正常 { background: #2f3640; color: #dcdde1; }
-        .st-背水一战 { background: #c23616; color: #fff; }
-        .st-饮鸩止渴 { background: #8c7ae6; color: #fff; }
-        .st-卧薪尝胆 { background: #e1b12c; color: #2f3640; }
-        .st-暗度陈仓 { background: #00a8ff; color: #fff; }
-        .hp-bar { color: #ff7675; font-size: 14px; margin: 4px 0; font-weight: bold; }
-        .prompt-panel { background: #2d142c; border: 2px dashed #e43f5a; padding: 15px; border-radius: 8px; margin-bottom: 15px; text-align: center; }
-        .prompt-title { color: #ff4d6d; font-weight: bold; margin-bottom: 10px; font-size: 15px; }
-        .prompt-btns { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
-        .btn-action { padding: 8px 16px; font-weight: bold; background: #162447; border: 1px solid #0f4c81; color: white; border-radius: 4px; cursor: pointer; transition: 0.1s; }
-        .btn-action:hover { background: #e43f5a; }
-        .my-zone { background: #162447; border-top: 3px solid #0f4c81; padding: 20px 25px; min-height: 280px; }
-        .zone-layout { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; }
-        .hand-wrapper { flex: 1; }
-        .section-title { font-size: 14px; color: #00fff0; font-weight: bold; margin-bottom: 12px; }
-        .cards-list { display: flex; gap: 14px; flex-wrap: wrap; }
+        .btn-rules:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.6);
+        }
+        .btn-reset {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            color: white;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 13px;
+            box-shadow: 0 2px 10px rgba(245, 87, 108, 0.4);
+            transition: 0.2s;
+        }
+        .btn-reset:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(245, 87, 108, 0.6);
+        }
+
+        /* 主内容区 */
+        .main-container {
+            display: flex;
+            height: calc(100vh - 60px);
+        }
+
+        /* 左侧战斗区 */
+        .battle-area {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        /* 大厅界面 */
+        .lobby-box {
+            max-width: 450px;
+            margin: 80px auto;
+            background: rgba(0, 0, 0, 0.5);
+            border: 2px solid #00fff0;
+            border-radius: 15px;
+            padding: 40px;
+            text-align: center;
+            box-shadow: 0 0 40px rgba(0, 255, 240, 0.2);
+        }
+        .lobby-box h2 {
+            color: #ffb423;
+            margin-bottom: 30px;
+            font-size: 28px;
+            text-shadow: 0 0 15px rgba(255, 180, 35, 0.5);
+        }
+        .lobby-box input {
+            width: 100%;
+            padding: 12px 16px;
+            font-size: 16px;
+            border: 2px solid #00fff0;
+            border-radius: 8px;
+            background: rgba(0, 0, 0, 0.3);
+            color: #fff;
+            margin-bottom: 20px;
+            outline: none;
+            transition: 0.2s;
+        }
+        .lobby-box input:focus {
+            border-color: #ffb423;
+            box-shadow: 0 0 15px rgba(255, 180, 35, 0.4);
+        }
+        .lobby-box .bot-select {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+        .lobby-box .bot-select label {
+            display: block;
+            margin-bottom: 8px;
+            color: #aaa;
+            font-size: 14px;
+        }
+        .lobby-box .bot-select select {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #00fff0;
+            border-radius: 6px;
+            background: rgba(0, 0, 0, 0.3);
+            color: #fff;
+            font-size: 14px;
+            outline: none;
+        }
+        .btn-join {
+            width: 100%;
+            padding: 14px;
+            font-size: 18px;
+            font-weight: bold;
+            background: linear-gradient(135deg, #00fff0 0%, #00a8ff 100%);
+            border: none;
+            border-radius: 8px;
+            color: #000;
+            cursor: pointer;
+            transition: 0.2s;
+            box-shadow: 0 4px 20px rgba(0, 255, 240, 0.4);
+        }
+        .btn-join:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 25px rgba(0, 255, 240, 0.6);
+        }
+        .lobby-info {
+            margin-top: 20px;
+            font-size: 13px;
+            color: #888;
+        }
+        .lobby-info .player-list {
+            margin-top: 10px;
+        }
+        .lobby-info .player-item {
+            padding: 6px 0;
+            color: #00fff0;
+        }
+
+        /* 玩家卡片 */
+        .players-container {
+            display: flex;
+            justify-content: space-around;
+            align-items: flex-start;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        .player-card {
+            width: 200px;
+            background: rgba(0, 0, 0, 0.5);
+            border: 2px solid #444;
+            border-radius: 12px;
+            padding: 15px;
+            text-align: center;
+            transition: 0.3s;
+            position: relative;
+        }
+        .player-card.current-turn {
+            border-color: #ffb423;
+            box-shadow: 0 0 25px rgba(255, 180, 35, 0.5);
+            transform: scale(1.05);
+        }
+        .player-card.dead {
+            opacity: 0.4;
+            filter: grayscale(100%);
+        }
+        .player-card.is-me {
+            border-color: #00fff0;
+            box-shadow: 0 0 20px rgba(0, 255, 240, 0.4);
+        }
+        .player-card .player-name {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: #fff;
+        }
+        .player-card .faction {
+            font-size: 14px;
+            padding: 3px 10px;
+            border-radius: 4px;
+            display: inline-block;
+            margin-bottom: 10px;
+        }
+        .faction.si { background: #ff4444; color: #fff; }
+        .faction.ji { background: #4488ff; color: #fff; }
+        .faction.ding { background: #44ff88; color: #000; }
+        .faction.hidden { background: #666; color: #fff; }
+        .player-card .hp-bar {
+            height: 20px;
+            background: #333;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 6px;
+            border: 1px solid #555;
+        }
+        .player-card .hp-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ff4444, #ff8844);
+            transition: width 0.3s;
+        }
+        .player-card .hp-text {
+            font-size: 13px;
+            color: #ff8844;
+            margin-bottom: 8px;
+        }
+        .player-card .status-tag {
+            font-size: 12px;
+            padding: 3px 8px;
+            border-radius: 4px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            display: inline-block;
+            margin-top: 5px;
+        }
+        .player-card .hand-count {
+            font-size: 13px;
+            color: #aaa;
+            margin-top: 8px;
+        }
+        .player-card .target-btn {
+            margin-top: 10px;
+            padding: 6px 12px;
+            background: linear-gradient(135deg, #ff6b6b, #ee5a52);
+            border: none;
+            border-radius: 5px;
+            color: white;
+            cursor: pointer;
+            font-size: 12px;
+            transition: 0.2s;
+        }
+        .player-card .target-btn:hover {
+            transform: scale(1.05);
+        }
+        .player-card .target-btn.selected {
+            background: linear-gradient(135deg, #ffb423, #ff8800);
+            box-shadow: 0 0 15px rgba(255, 180, 35, 0.6);
+        }
+        .player-card .target-btn:disabled {
+            background: #555;
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+
+        /* 提示面板 */
+        .prompt-panel {
+            max-width: 500px;
+            margin: 20px auto;
+            background: rgba(255, 180, 35, 0.15);
+            border: 2px solid #ffb423;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 10px rgba(255, 180, 35, 0.3); }
+            50% { box-shadow: 0 0 25px rgba(255, 180, 35, 0.6); }
+        }
+        .prompt-panel h3 {
+            color: #ffb423;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+        .prompt-panel .prompt-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .prompt-panel .prompt-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 14px;
+            transition: 0.2s;
+        }
+        .prompt-btn.defense {
+            background: linear-gradient(135deg, #4facfe, #00f2fe);
+            color: #000;
+        }
+        .prompt-btn.greatwall {
+            background: linear-gradient(135deg, #43e97b, #38f9d7);
+            color: #000;
+        }
+        .prompt-btn.giveup {
+            background: linear-gradient(135deg, #fa709a, #fee140);
+            color: #000;
+        }
+        .prompt-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        }
+        .prompt-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* 背水一战选择 */
+        .beishui-options {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .beishui-btn {
+            padding: 8px 16px;
+            background: linear-gradient(135deg, #ff6b6b, #ee5a52);
+            border: none;
+            border-radius: 6px;
+            color: white;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.2s;
+        }
+        .beishui-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        /* 右侧日志区 */
+        .log-sidebar {
+            width: 320px;
+            background: rgba(0, 0, 0, 0.4);
+            border-left: 2px solid #00fff0;
+            display: flex;
+            flex-direction: column;
+        }
+        .log-sidebar h3 {
+            padding: 15px;
+            color: #00fff0;
+            border-bottom: 1px solid #00fff0;
+            font-size: 16px;
+        }
+        .log-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px 15px;
+            font-size: 13px;
+            line-height: 1.8;
+        }
+        .log-content .log-item {
+            margin-bottom: 6px;
+            color: #ccc;
+            border-bottom: 1px dashed #333;
+            padding-bottom: 4px;
+        }
+        .log-content::-webkit-scrollbar { width: 6px; }
+        .log-content::-webkit-scrollbar-track { background: #1a1a2e; }
+        .log-content::-webkit-scrollbar-thumb { background: #00fff0; border-radius: 3px; }
+
+        /* 底部操作区 */
+        .bottom-panel {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 320px;
+            background: rgba(0, 0, 0, 0.7);
+            border-top: 2px solid #ffb423;
+            padding: 20px 25px;
+            min-height: 280px;
+            box-shadow: 0 -4px 30px rgba(255, 180, 35, 0.2);
+        }
+        .bottom-panel .hand-section {
+            display: flex;
+            align-items: flex-start;
+            gap: 20px;
+        }
+        .bottom-panel .status-section {
+            width: 320px;
+            flex-shrink: 0;
+        }
+        .bottom-panel .status-section h4 {
+            color: #ffb423;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+        .status-cards {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .status-card {
+            padding: 10px 15px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: bold;
+            transition: 0.2s;
+            text-align: center;
+            min-width: 90px;
+        }
+        .status-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.5);
+        }
+        .status-card.on-cooldown {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .status-card .cooldown-text {
+            font-size: 11px;
+            color: #ffb423;
+            margin-top: 3px;
+        }
+
+        .hand-cards {
+            flex: 1;
+            display: flex;
+            gap: 14px;
+            flex-wrap: wrap;
+        }
         #basic-hand-anchor {
             max-height: 230px;
             overflow-y: auto;
@@ -67,48 +476,114 @@
         #basic-hand-anchor::-webkit-scrollbar-track { background: #1f4068; border-radius: 4px; }
         #basic-hand-anchor::-webkit-scrollbar-thumb { background: #00fff0; border-radius: 4px; }
         #basic-hand-anchor::-webkit-scrollbar-thumb:hover { background: #00cccc; }
-        .card-item {
-            background: #1f4068; border: 1px solid #0f4c81; padding: 16px 22px;
-            border-radius: 10px; cursor: pointer; font-weight: bold; font-size: 17px;
-            min-width: 110px; text-align: center; color: white; transition: 0.2s;
+
+        .hand-card {
+            min-width: 110px;
+            padding: 16px 22px;
+            background: linear-gradient(135deg, #1f4068, #162447);
+            border: 2px solid #00fff0;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 17px;
+            font-weight: bold;
+            text-align: center;
+            transition: 0.2s;
+            position: relative;
         }
-        .card-item:hover { background: #00fff0; color: #1a1a2e; transform: translateY(-3px); }
-        .card-item:disabled { background: #535c68; color: #aaa; cursor: not-allowed; transform: none; }
-        .st-card-item { background: #341f97; border-color: #5f27cd; }
-        .st-card-item:hover { background: #ffa502; color: #000; }
-        .side-bar { flex: 1.3; background: #111122; border-left: 2px solid #162447; display: flex; flex-direction: column; overflow: hidden; }
-        .log-container { flex: 1; padding: 12px; overflow-y: auto; font-size: 12px; font-family: monospace; background: #0d0d18; }
-        .log-line { margin-bottom: 6px; border-bottom: 1px solid #161625; padding-bottom: 4px; color: #a0aec0; }
-        #rules-modal {
-            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0, 0, 0, 0.85); z-index: 9998; justify-content: center; align-items: center;
+        .hand-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 8px 25px rgba(0, 255, 240, 0.4);
+            border-color: #ffb423;
         }
-        .rules-box {
-            background: #162447; padding: 30px 35px; border-radius: 15px; border: 3px solid #00fff0;
-            box-shadow: 0 0 40px rgba(0, 255, 240, 0.4);
-            max-width: 700px; width: 90%; max-height: 85vh; overflow-y: auto;
+        .hand-card.defense {
+            border-color: #4facfe;
+            background: linear-gradient(135deg, #1e3a5f, #0f2744);
         }
-        .rules-box h2 { color: #00fff0; margin-bottom: 20px; text-align: center; font-size: 22px; }
-        .rules-close-btn {
-            position: absolute; top: 20px; right: 25px; background: none; border: none;
-            color: #fff; font-size: 28px; cursor: pointer; opacity: 0.7;
+        .hand-card.attack {
+            border-color: #ff6b6b;
+            background: linear-gradient(135deg, #5c1f1f, #3d1414);
         }
-        .rules-close-btn:hover { opacity: 1; }
-        .rules-modal-section { margin-bottom: 18px; }
-        .rules-modal-sub { font-weight: bold; color: #ffb423; margin-bottom: 6px; font-size: 15px; }
-        .rules-modal-text { color: #cbd5e1; line-height: 1.6; font-size: 13px; }
-        .rules-modal-table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-        .rules-modal-table th, .rules-modal-table td { padding: 6px 8px; border: 1px solid #1f4068; text-align: left; font-size: 12px; }
-        .rules-modal-table th { background: #1f4068; color: #ffb423; }
+        .hand-card.heal {
+            border-color: #43e97b;
+            background: linear-gradient(135deg, #1f5c3a, #143d28);
+        }
+        .hand-card.special {
+            border-color: #ffb423;
+            background: linear-gradient(135deg, #5c4a1f, #3d3214);
+        }
+        .hand-card .anduxu-btn {
+            position: absolute;
+            bottom: -8px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 13px;
+            padding: 4px 8px;
+            background: linear-gradient(135deg, #ffb423, #ff8800);
+            border: none;
+            border-radius: 4px;
+            color: #000;
+            cursor: pointer;
+            white-space: nowrap;
+            display: none;
+        }
+        .hand-card:hover .anduxu-btn {
+            display: block;
+        }
+        .hand-card.disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+        .hand-card.disabled:hover {
+            transform: none;
+            box-shadow: none;
+        }
+
+        .end-turn-btn {
+            position: absolute;
+            right: 25px;
+            top: 50%;
+            transform: translateY(-50%);
+            padding: 20px 32px;
+            background: linear-gradient(135deg, #ffb423, #ff8800);
+            border: none;
+            border-radius: 10px;
+            color: #000;
+            font-size: 17px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.2s;
+            box-shadow: 0 4px 20px rgba(255, 180, 35, 0.5);
+        }
+        .end-turn-btn:hover {
+            transform: translateY(-50%) scale(1.05);
+            box-shadow: 0 6px 30px rgba(255, 180, 35, 0.7);
+        }
+        .end-turn-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: translateY(-50%);
+        }
+
+        /* 胜利弹窗 */
         #victory-modal {
-            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0, 0, 0, 0.85); z-index: 9999; justify-content: center; align-items: center;
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
         }
         .victory-box {
             background: linear-gradient(135deg, #1f4068 0%, #162447 50%, #1f4068 100%);
-            padding: 50px 60px; border-radius: 18px; border: 4px solid #ffb423;
+            padding: 50px 60px;
+            border-radius: 18px;
+            border: 4px solid #ffb423;
             box-shadow: 0 0 60px #ffb423, 0 0 120px rgba(255, 180, 35, 0.5), inset 0 0 40px rgba(255, 180, 35, 0.1);
-            text-align: center; max-width: 500px; width: 90%;
+            text-align: center;
+            max-width: 500px;
+            width: 90%;
             animation: popIn 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
         }
         @keyframes popIn {
@@ -117,138 +592,299 @@
             100% { transform: scale(1); opacity: 1; }
         }
         .victory-box h2 {
-            color: #ffb423; margin-bottom: 20px; font-size: 28px;
+            color: #ffb423;
+            margin-bottom: 20px;
+            font-size: 28px;
             text-shadow: 0 0 20px #ffb423, 0 0 40px rgba(255, 180, 35, 0.6);
             letter-spacing: 3px;
         }
-        .victory-box p { color: #e2e8f0; font-size: 16px; margin-bottom: 25px; line-height: 1.7; }
-        .connection-status { font-size: 12px; padding: 4px 10px; border-radius: 4px; margin-right: 10px; }
-        .conn-online { background: #00b894; color: white; }
-        .conn-offline { background: #e43f5a; color: white; }
-        .conn-connecting { background: #f39c12; color: white; }
-        .conn-error-box { background: #2d142c; border: 2px solid #e43f5a; padding: 15px; border-radius: 8px; margin-bottom: 15px; color: #ff6b6b; font-size: 13px; display: none; }
+        .victory-box p {
+            color: #fff;
+            font-size: 16px;
+            line-height: 1.8;
+            margin-bottom: 30px;
+        }
+        .victory-box button {
+            padding: 14px 40px;
+            font-size: 16px;
+            font-weight: bold;
+            background: linear-gradient(135deg, #ffb423, #ff8800);
+            border: none;
+            border-radius: 8px;
+            color: #000;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .victory-box button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 30px rgba(255, 180, 35, 0.6);
+        }
+
+        /* 规则弹窗 */
+        #rules-modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 9998;
+            justify-content: center;
+            align-items: center;
+        }
+        .rules-box {
+            background: #162447;
+            padding: 30px 35px;
+            border-radius: 15px;
+            border: 3px solid #00fff0;
+            box-shadow: 0 0 40px rgba(0, 255, 240, 0.4);
+            max-width: 700px;
+            width: 90%;
+            max-height: 85vh;
+            overflow-y: auto;
+        }
+        .rules-box h2 {
+            color: #00fff0;
+            margin-bottom: 20px;
+            text-align: center;
+            font-size: 24px;
+        }
+        .rules-box h3 {
+            color: #ffb423;
+            margin-top: 20px;
+            margin-bottom: 10px;
+            font-size: 18px;
+            border-bottom: 1px solid #ffb423;
+            padding-bottom: 5px;
+        }
+        .rules-box p, .rules-box li {
+            color: #ccc;
+            line-height: 1.8;
+            font-size: 14px;
+        }
+        .rules-box ul {
+            margin-left: 20px;
+            margin-bottom: 10px;
+        }
+        .rules-box .card-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+        }
+        .rules-box .card-table th, .rules-box .card-table td {
+            border: 1px solid #444;
+            padding: 8px 12px;
+            text-align: left;
+            font-size: 13px;
+        }
+        .rules-box .card-table th {
+            background: #1f4068;
+            color: #00fff0;
+        }
+        .rules-box .close-btn {
+            display: block;
+            margin: 25px auto 0;
+            padding: 10px 30px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border: none;
+            border-radius: 6px;
+            color: white;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        /* 错误提示 */
+        .toast {
+            position: fixed;
+            top: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 68, 68, 0.9);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            z-index: 10000;
+            font-size: 14px;
+            animation: slideDown 0.3s ease-out;
+        }
+        @keyframes slideDown {
+            from { top: 40px; opacity: 0; }
+            to { top: 80px; opacity: 1; }
+        }
     </style>
 </head>
 <body>
-    <header>
-        <h1>三国kill</h1>
-        <div style="display: flex; align-items: center;">
+    <!-- 顶部导航栏 -->
+    <div class="top-bar">
+        <div class="left-group">
+            <h1>⚔️ 三国Kill · 三人身份局</h1>
             <button class="btn-rules" onclick="toggleRules()">📜 规则图鉴</button>
-            <span id="conn-status" class="connection-status conn-connecting">连接中...</span>
-            <div id="game-meta" style="font-size: 13px; color: #cbd5e1; margin-right: 15px;">大厅集结中...</div>
-            <button class="btn" style="width:auto; padding:5px 12px; font-size:12px;" onclick="resetGame()">暴力重置房间</button>
         </div>
-    </header>
+        <div class="right-group">
+            <div class="game-meta" id="game-meta" style="display:none;">
+                第 <span id="round-num">1</span> 轮 · 剩余行动力 <span id="actions-left">0</span> · 牌库 <span id="deck-count">0</span> 张
+            </div>
+            <div class="conn-status disconnected" id="conn-status">连接中...</div>
+            <button class="btn-reset" onclick="resetGame()">🔄 重置游戏</button>
+        </div>
+    </div>
+
+    <!-- 主内容区 -->
     <div class="main-container">
-        <div class="battle-zone">
-            <div id="lobby">
-                <div style="font-size:20px; margin-bottom:20px; color:#00fff0; font-weight:bold;">⚔️ 决战大厅 ⚔️</div>
-                <div id="conn-error" class="conn-error-box">⚠️ 连接服务器失败！请检查网络或刷新页面重试。</div>
-                <div class="form-group">
-                    <label>本局昵称（断线后输入相同昵称可重新连入）：</label>
-                    <input type="text" id="username" placeholder="输入战神名...">
-                </div>
-                <div class="form-group">
-                    <label>人机数量配置：</label>
-                    <select id="bot-select" onchange="changeBotCount()">
-                        <option value="2" selected>补满 2 个人机 (单人速开)</option>
-                        <option value="1">补满 1 个人机 (双人畅玩)</option>
-                        <option value="0">不要人机 (纯真人博弈)</option>
+        <!-- 左侧战斗区 -->
+        <div class="battle-area" id="battle-area">
+            <!-- 大厅界面 -->
+            <div class="lobby-box" id="lobby-box">
+                <h2>🎮 加入战斗</h2>
+                <input type="text" id="player-name" placeholder="输入你的昵称" maxlength="15">
+                <div class="bot-select">
+                    <label>机器人数量：</label>
+                    <select id="bot-count" onchange="changeBotCount()">
+                        <option value="0">0 个（真人对战）</option>
+                        <option value="1">1 个</option>
+                        <option value="2" selected>2 个</option>
                     </select>
                 </div>
-                <button class="btn" id="join-btn" onclick="joinGame()" disabled>连接服务器中...</button>
-                <div id="lobby-status" style="margin-top:15px; font-size:12px; color:#cbd5e1;"></div>
-            </div>
-            <div id="game-board" style="display: none;">
-                <div style="text-align: center; margin-bottom: 10px; font-size: 12px; color: #ffb423;">
-                    💡 [操作指引] 打出指向性卡牌前，请先点击其他玩家的头像，锁定目标（亮起红色高亮框）再点击出手！
-                </div>
-                <div class="players-row" id="players-anchor"></div>
-                <div id="prompt-zone"></div>
-            </div>
-        </div>
-        <div class="side-bar">
-            <div class="log-container" id="log-box"></div>
-        </div>
-    </div>
-    <div class="my-zone" id="player-interaction" style="display: none;">
-        <div class="zone-layout">
-            <div class="hand-wrapper">
-                <div class="section-title" id="action-turn-title">🎮 战斗状态指示</div>
-                <div class="cards-list" id="basic-hand-anchor"></div>
-            </div>
-            <div class="hand-wrapper" style="max-width: 320px;">
-                <div class="section-title">⚡ 状态装备牌栏 (点击装备/更换)</div>
-                <div class="cards-list" id="status-hand-anchor"></div>
-            </div>
-            <div style="display: flex; align-items: center; height: 100%;">
-                <button class="btn" style="background:#00b894; padding:20px 32px; font-size: 17px; white-space: nowrap;" onclick="endTurn()">结束我的出牌回合</button>
-            </div>
-        </div>
-    </div>
-    <div id="rules-modal">
-        <div class="rules-box" style="position: relative;">
-            <button class="rules-close-btn" onclick="toggleRules()">×</button>
-            <h2>📜 游戏机制与全卡牌规则图鉴</h2>
-            <div class="rules-modal-section">
-                <div class="rules-modal-sub">一、阵营与终极胜负法则</div>
-                <div class="rules-modal-text">▪ <b>【司】</b>：独立作战，胜利条件为：<b>击杀【冀】</b>。</div>
-                <div class="rules-modal-text">▪ <b>【冀】</b>：与丁同盟，胜利条件为：<b>联合击杀【司】</b>。</div>
-                <div class="rules-modal-text">▪ <b>【丁】</b>：守护神。血量首次归零时<b>原地复活</b>（回满体力并抽3张牌），并<b>向全场强制公开所有人的真实身份</b>！</div>
-                <div class="rules-modal-text" style="color: #ff4d6d; font-weight: bold; margin-top: 6px; border-left: 2px solid #ff4d6d; padding-left: 8px;">
-                    🌟 【特别觉醒规则】当【丁】死亡并原地复活致使全场身份公开时，作为对抗惩罚，【司】将瞬间强制无条件获得 10 张基本手牌！
+                <button class="btn-join" onclick="joinGame()">⚔️ 加入游戏</button>
+                <div class="lobby-info">
+                    <div>已在大厅：<span id="lobby-count">0</span> 人</div>
+                    <div class="player-list" id="lobby-players"></div>
                 </div>
             </div>
-            <div class="rules-modal-section">
-                <div class="rules-modal-sub">二、行动力与回合规则</div>
-                <div class="rules-modal-text">▪ <b>第X轮 = X+1行动力</b>：第1轮2点，第2轮3点，以此类推</div>
-                <div class="rules-modal-text">▪ <b>3玩家 = 1轮</b>：3个存活玩家各出完牌为1轮，1个玩家出牌为1回合</div>
-                <div class="rules-modal-text">▪ <b>新一轮开始补牌</b>：每轮开始时所有玩家自动补手牌至5张</div>
-                <div class="rules-modal-text">▪ <b>行动力耗尽强制结束</b>：行动力用完必须结束回合</div>
-            </div>
-            <div class="rules-modal-section">
-                <div class="rules-modal-sub">三、核心基础卡牌数据库（共200张）</div>
-                <table class="rules-modal-table">
-                    <tr><th>牌名</th><th>类型</th><th>效果说明 (每次耗1行动力)</th></tr>
-                    <tr><td>攻</td><td>主动</td><td>对目标造成 1 点伤害，可被【防/长城】抵挡。</td></tr>
-                    <tr><td>防</td><td>被动</td><td>防守绝技。只能响应【攻】或【荆轲刺秦】。</td></tr>
-                    <tr><td>长城</td><td>被动</td><td>全面免疫神技！1张便可废掉针对你的牌。</td></tr>
-                    <tr><td>回血</td><td>主动</td><td>恢复 1 点生命，不可超过上限。</td></tr>
-                    <tr><td>卡牌大师</td><td>主动</td><td>强力过牌，立刻额外补充 2 张新基础手牌。</td></tr>
-                    <tr><td>荆轲刺秦</td><td>主动</td><td>造成 2 点伤害，对方结算后使用者受到 1 点反噬。</td></tr>
-                    <tr><td>一字马</td><td>主动</td><td>强行剥夺目标下个轮次的所有行动权。</td></tr>
-                    <tr><td>顺手牵羊</td><td>主动</td><td>强行摸走目标 1 张手牌。</td></tr>
-                    <tr><td>江山易主</td><td>主动</td><td>将自己全部手牌与目标大对调。</td></tr>
-                    <tr><td>同归于尽</td><td>主动</td><td>自爆袭击，让彼此强制扣减 1 点体力。</td></tr>
-                </table>
-            </div>
-            <div class="rules-modal-section">
-                <div class="rules-modal-sub">四、状态卡牌觉醒词条</div>
-                <div class="rules-modal-text">▪ <b>【背水一战】</b>：上限重置为5。轮到自己时可献祭 X 点血（X小于等于3），暴抽 X+1 张。</div>
-                <div class="rules-modal-text">▪ <b>【饮鸩止渴】</b>：血量与上限瞬间撑爆至 10！<b>每回合开始毒发，上限-3（最低为1）</b>。</div>
-                <div class="rules-modal-text">▪ <b>【卧薪尝胆】</b>：上限5。自带减伤（受攻降为0，受刺秦降为1），打非回血手牌受1点反噬。</div>
-                <div class="rules-modal-text">▪ <b>【暗度陈仓】</b>：上限5。出牌时可将防当攻打；防守时可将攻当防打。</div>
+
+            <!-- 游戏界面（初始隐藏） -->
+            <div id="game-ui" style="display:none;">
+                <div class="players-container" id="players-container"></div>
+                <div class="prompt-panel" id="prompt-panel" style="display:none;">
+                    <h3 id="prompt-title">请选择</h3>
+                    <div class="prompt-buttons" id="prompt-buttons"></div>
+                </div>
             </div>
         </div>
+
+        <!-- 右侧日志区 -->
+        <div class="log-sidebar">
+            <h3>📋 战斗日志</h3>
+            <div class="log-content" id="log-content"></div>
+        </div>
     </div>
+
+    <!-- 底部操作区 -->
+    <div class="bottom-panel" id="bottom-panel" style="display:none;">
+        <div class="hand-section">
+            <div class="status-section">
+                <h4>🎴 状态装备</h4>
+                <div class="status-cards" id="status-cards"></div>
+            </div>
+            <div style="flex:1;">
+                <h4 style="color:#00fff0; margin-bottom:10px; font-size:14px;">🃏 手牌</h4>
+                <div class="hand-cards" id="basic-hand-anchor"></div>
+            </div>
+        </div>
+        <button class="end-turn-btn" id="end-turn-btn" onclick="endTurn()">结束回合 ➡️</button>
+    </div>
+
+    <!-- 胜利弹窗 -->
     <div id="victory-modal">
         <div class="victory-box">
-            <h2 id="victory-title">🏆 决战落幕 🏆</h2>
+            <h2 id="victory-title">🏆 胜利！</h2>
             <p id="victory-msg"></p>
-            <button class="btn" onclick="resetGame()" style="max-width: 180px; margin: 0 auto; display: block;">返回大厅</button>
+            <button onclick="resetGame()">再来一局</button>
         </div>
     </div>
+
+    <!-- 规则弹窗 -->
+    <div id="rules-modal">
+        <div class="rules-box">
+            <h2>📜 游戏规则图鉴</h2>
+
+            <h3>🎯 三大阵营</h3>
+            <table class="card-table">
+                <tr><th>阵营</th><th>身份</th><th>人数</th><th>胜利条件</th><th>特殊技能</th></tr>
+                <tr><td style="color:#ff4444;">司</td><td>叛逆者</td><td>1人</td><td>击杀【冀】</td><td>丁复活时强制抽10张牌</td></tr>
+                <tr><td style="color:#4488ff;">冀</td><td>主星</td><td>1人</td><td>联合丁击杀司</td><td>无</td></tr>
+                <tr><td style="color:#44ff88;">丁</td><td>护卫</td><td>1人</td><td>联合冀击杀司</td><td>首次死亡原地复活（回满血+抽3张牌），并公开全场所有人身份</td></tr>
+            </table>
+
+            <h3>⚡ 行动力机制</h3>
+            <ul>
+                <li>第X轮 = X+1行动力（第1轮2点，第2轮3点，以此类推）</li>
+                <li>每出一张牌消耗1行动力</li>
+                <li>3个玩家各行动1次 = 1轮</li>
+                <li>每轮开始自动补手牌至5张</li>
+                <li>行动力用完或主动结束回合</li>
+            </ul>
+
+            <h3>🃏 基本牌（共200张）</h3>
+            <table class="card-table">
+                <tr><th>牌名</th><th>数量</th><th>类型</th><th>效果</th></tr>
+                <tr><td>攻</td><td>50</td><td>主动</td><td>造成1点伤害，可被防/长城抵挡</td></tr>
+                <tr><td>防</td><td>45</td><td>被动</td><td>格挡攻或荆轲刺秦（1张防挡1层伤害）</td></tr>
+                <tr><td>长城</td><td>20</td><td>被动</td><td>绝对免疫，废掉整张针对你的牌（包括荆轲刺秦的自损反噬）</td></tr>
+                <tr><td>回血</td><td>25</td><td>主动</td><td>恢复1点生命，不可超过上限</td></tr>
+                <tr><td>卡牌大师</td><td>20</td><td>主动</td><td>抽2张牌</td></tr>
+                <tr><td>荆轲刺秦</td><td>8</td><td>主动</td><td>造成2点伤害（需2张防完全格挡），对方结算后使用者自损1点反噬（被长城完全免疫时不自损）</td></tr>
+                <tr><td>一字马</td><td>8</td><td>主动</td><td>目标跳过下回合</td></tr>
+                <tr><td>顺手牵羊</td><td>15</td><td>主动</td><td>偷目标1张手牌</td></tr>
+                <tr><td>江山易主</td><td>4</td><td>主动</td><td>与目标交换全部手牌</td></tr>
+                <tr><td>同归于尽</td><td>5</td><td>主动</td><td>双方各扣1血</td></tr>
+            </table>
+
+            <h3>🛡️ 状态牌（装备系统）</h3>
+            <table class="card-table">
+                <tr><th>状态</th><th>效果</th><th>冷却</th></tr>
+                <tr><td>背水一战</td><td>上限重置为5。回合开始可献祭X点血，抽X+1张牌</td><td>装备后3回合冷却</td></tr>
+                <tr><td>饮鸩止渴</td><td>血量与上限瞬间变为10，每回合开始毒发上限-3（最低为1）</td><td>装备后3回合冷却</td></tr>
+                <tr><td>卧薪尝胆</td><td>上限5。受攻减伤为0，受刺秦减伤为1；但打非回血牌自损1血</td><td>装备后3回合冷却</td></tr>
+                <tr><td>暗度陈仓</td><td>上限5。出牌时可将防当攻打；防守时可将攻当防打</td><td>装备后3回合冷却</td></tr>
+            </table>
+
+            <h3>⚔️ 攻击防御机制</h3>
+            <ul>
+                <li>荆轲刺秦需要2层防御（2张防或攻_as_防）</li>
+                <li>每抵挡1层，剩余伤害-1</li>
+                <li>长城可完全免疫整张牌，连荆轲刺秦的自损反噬也一起废掉</li>
+                <li>卧薪尝胆被动减伤在防御结算后再计算</li>
+                <li>荆轲刺秦的自损1点在对方防御结算完成后扣除，无论是否命中都自损；被长城完全免疫时不自损</li>
+            </ul>
+
+            <button class="close-btn" onclick="toggleRules()">关闭</button>
+        </div>
+    </div>
+
     <script>
-        const socket = io({
-            transports: ['websocket', 'polling'],
-            reconnection: true, reconnectionDelay: 1000, reconnectionDelayMax: 5000
-        });
-        let myIndex = null;
+        const socket = io();
+        let myIndex = -1;
         let selectedTargetIdx = -1;
         let currentStatusCooldown = 0;
         let gameState = null;
         let isConnected = false;
 
+        // 更新连接状态
+        function updateConnStatus(status, text) {
+            const el = document.getElementById('conn-status');
+            el.className = 'conn-status ' + status;
+            el.textContent = text;
+        }
+
+        socket.on('connect', () => {
+            isConnected = true;
+            updateConnStatus('connected', '✅ 已连接');
+        });
+
+        socket.on('disconnect', () => {
+            isConnected = false;
+            updateConnStatus('disconnected', '❌ 已断开');
+        });
+
+        socket.on('connect_error', () => {
+            updateConnStatus('disconnected', '❌ 连接失败');
+        });
+
+        socket.on('reconnecting', () => {
+            updateConnStatus('disconnected', '🔄 重连中...');
+        });
+
+        // 规则弹窗
         function toggleRules() {
             const modal = document.getElementById('rules-modal');
             if (modal.style.display === 'flex') {
@@ -258,217 +894,345 @@
             }
         }
 
-        function updateConnStatus(status, text) {
-            const statusEl = document.getElementById('conn-status');
-            statusEl.textContent = text;
-            statusEl.className = 'connection-status conn-' + status;
-            const joinBtn = document.getElementById('join-btn');
-            const connError = document.getElementById('conn-error');
-            if (status === 'online') {
-                isConnected = true;
-                if (joinBtn) { joinBtn.disabled = false; joinBtn.textContent = '确认加入对局'; }
-                if (connError) connError.style.display = 'none';
-            } else {
-                isConnected = false;
-                if (joinBtn) { joinBtn.disabled = true; joinBtn.textContent = status === 'connecting' ? '连接服务器中...' : '服务器连接失败'; }
-                if (status === 'offline' && connError) { connError.style.display = 'block'; }
+        // 大厅更新
+        socket.on('lobby_update', (data) => {
+            document.getElementById('lobby-count').textContent = data.count;
+            const playersEl = document.getElementById('lobby-players');
+            playersEl.innerHTML = data.players.map(p => 
+                '<div class="player-item">👤 ' + p.name + '</div>'
+            ).join('');
+            if (data.game_active) {
+                document.getElementById('lobby-box').style.display = 'none';
             }
-        }
+        });
 
-        socket.on('connect', () => updateConnStatus('online', '● 已连接'));
-        socket.on('disconnect', () => updateConnStatus('offline', '● 连接断开'));
-        socket.on('connect_error', () => updateConnStatus('offline', '● 连接失败'));
-        socket.on('reconnecting', () => updateConnStatus('connecting', '● 重连中...'));
-
+        // 加入游戏
         function joinGame() {
-            if (!isConnected) return alert("⚠️ 还没连上服务器，请稍等或刷新页面！");
-            const name = document.getElementById("username").value.trim();
-            if(!name) return alert("请输入昵称！");
-            const bc = document.getElementById("bot-select").value;
-            socket.emit('change_bot_count', { bot_count: bc });
+            const name = document.getElementById('player-name').value.trim();
+            if (!name) {
+                showToast('请先输入昵称！');
+                return;
+            }
+            if (name.length > 15) {
+                showToast('昵称不能超过15个字符！');
+                return;
+            }
             socket.emit('join_game', { name: name });
         }
 
+        // 修改机器人数量
         function changeBotCount() {
-            if (!isConnected) return;
-            const bc = document.getElementById("bot-select").value;
-            socket.emit('change_bot_count', { bot_count: bc });
+            const count = parseInt(document.getElementById('bot-count').value);
+            socket.emit('change_bot_count', { bot_count: count });
         }
 
+        // 重置游戏
         function resetGame() {
-            if (!isConnected) return alert("⚠️ 还没连上服务器！");
-            if(confirm("确定要强制重置整个房间吗？所有玩家都会被踢回大厅。")) socket.emit('reset_game');
+            if (confirm('确定要重置游戏吗？')) {
+                socket.emit('reset_game');
+            }
         }
 
+        socket.on('force_reload_all', () => {
+            location.reload();
+        });
+
+        // 游戏状态更新
+        socket.on('game_update', (state) => {
+            gameState = state;
+            myIndex = state.my_idx;
+
+            // 隐藏大厅，显示游戏界面
+            document.getElementById('lobby-box').style.display = 'none';
+            document.getElementById('game-ui').style.display = 'block';
+            document.getElementById('bottom-panel').style.display = 'block';
+            document.getElementById('game-meta').style.display = 'inline';
+
+            // 更新顶部信息
+            document.getElementById('round-num').textContent = state.round;
+            document.getElementById('actions-left').textContent = state.actions_left;
+            document.getElementById('deck-count').textContent = state.deck_count;
+
+            // 渲染玩家卡片
+            renderPlayers(state.players);
+
+            // 渲染手牌
+            renderHand(state.my_cards, state.my_status);
+
+            // 渲染状态牌
+            renderStatusCards(state.my_status_cards, state.my_status, state.players[myIndex].status_cooldown);
+
+            // 处理防御提示
+            if (state.is_my_response) {
+                showDefensePrompt(state.pending_card, state.required_defenses);
+            } else {
+                hideDefensePrompt();
+            }
+
+            // 处理背水一战提示
+            if (state.is_beishui_prompt) {
+                showBeishuiPrompt();
+            }
+
+            // 更新结束回合按钮状态
+            const endBtn = document.getElementById('end-turn-btn');
+            endBtn.disabled = (state.current_idx !== myIndex || state.is_my_response || state.is_beishui_prompt);
+        });
+
+        // 渲染玩家卡片
+        function renderPlayers(players) {
+            const container = document.getElementById('players-container');
+            container.innerHTML = '';
+            players.forEach((p, idx) => {
+                const isMe = (idx === myIndex);
+                const isCurrent = (idx === gameState.current_idx);
+                const isDead = !p.alive;
+
+                let factionClass = 'hidden';
+                let factionText = '隐藏';
+                if (p.faction === '司') { factionClass = 'si'; factionText = '司 · 叛逆者'; }
+                else if (p.faction === '冀') { factionClass = 'ji'; factionText = '冀 · 主星'; }
+                else if (p.faction === '丁') { factionClass = 'ding'; factionText = '丁 · 护卫'; }
+
+                const hpPercent = Math.max(0, (p.hp / p.max_hp) * 100);
+
+                const card = document.createElement('div');
+                card.className = 'player-card' + (isCurrent ? ' current-turn' : '') + (isDead ? ' dead' : '') + (isMe ? ' is-me' : '');
+                card.innerHTML = `
+                    <div class="player-name">${p.name}${isMe ? ' (你)' : ''}${isCurrent ? ' 👑' : ''}</div>
+                    <div class="faction ${factionClass}">${factionText}</div>
+                    <div class="hp-bar"><div class="hp-fill" style="width:${hpPercent}%"></div></div>
+                    <div class="hp-text">${p.hp} / ${p.max_hp}</div>
+                    ${p.status !== '正常' ? `<div class="status-tag">${p.status}${p.status_cooldown > 0 ? ' (' + p.status_cooldown + ')' : ''}</div>` : ''}
+                    <div class="hand-count">🃏 手牌 ${p.hand_count} 张</div>
+                    ${!isDead && !isMe && gameState.current_idx === myIndex ? 
+                        `<button class="target-btn ${selectedTargetIdx === idx ? 'selected' : ''}" onclick="selectTarget(${idx})">
+                            ${selectedTargetIdx === idx ? '🎯 已选中' '锁定目标'}
+                        </button>` : ''}
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        // 选择目标
         function selectTarget(idx) {
-            if (idx === myIndex) return alert("🚩 操作提示：不能锁定你自己哦！请点击其他玩家头像框进行对敌锁定。");
-            const tgtCard = document.getElementById(`pcard-${idx}`);
-            if (tgtCard && tgtCard.classList.contains('dead')) return alert("💀 目标已阵亡，无法进行锁定！");
             selectedTargetIdx = idx;
-            const cards = document.getElementsByClassName('player-card');
-            for(let card of cards) card.classList.remove('selected-target');
-            if (tgtCard) tgtCard.classList.add('selected-target');
+            renderPlayers(gameState.players);
         }
 
+        // 渲染手牌
+        function renderHand(cards, myStatus) {
+            const container = document.getElementById('basic-hand-anchor');
+            container.innerHTML = '';
+            cards.forEach(card => {
+                const cardEl = document.createElement('div');
+                let cardClass = 'hand-card';
+                if (['攻', '荆轲刺秦', '同归于尽'].includes(card)) cardClass += ' attack';
+                else if (['防'].includes(card)) cardClass += ' defense';
+                else if (['回血'].includes(card)) cardClass += ' heal';
+                else cardClass += ' special';
+
+                // 不能主动出的牌（防、长城）
+                const isPassive = (card === '防' || card === '长城');
+                const canPlay = !isPassive || (myStatus === '暗度陈仓' && card === '防');
+                if (!canPlay) cardClass += ' disabled';
+
+                cardEl.className = cardClass;
+                cardEl.textContent = card;
+
+                if (canPlay && gameState.current_idx === myIndex) {
+                    cardEl.onclick = () => playCard(card);
+                }
+
+                // 暗度陈仓：防可以当攻打
+                if (myStatus === '暗度陈仓' && card === '防' && gameState.current_idx === myIndex) {
+                    const anduxuBtn = document.createElement('button');
+                    anduxuBtn.className = 'anduxu-btn';
+                    anduxuBtn.textContent = '当攻打';
+                    anduxuBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        playAnduxu(card, '攻');
+                    };
+                    cardEl.appendChild(anduxuBtn);
+                }
+
+                container.appendChild(cardEl);
+            });
+        }
+
+        // 渲染状态牌
+        function renderStatusCards(statusCards, currentStatus, cooldown) {
+            const container = document.getElementById('status-cards');
+            container.innerHTML = '';
+            if (currentStatus !== '正常' && cooldown > 0) {
+                const activeCard = document.createElement('div');
+                activeCard.className = 'status-card on-cooldown';
+                activeCard.innerHTML = `${currentStatus}<div class="cooldown-text">冷却 ${cooldown} 回合</div>`;
+                container.appendChild(activeCard);
+            } else {
+                statusCards.forEach(card => {
+                    const cardEl = document.createElement('div');
+                    cardEl.className = 'status-card';
+                    cardEl.textContent = card;
+                    if (gameState.current_idx === myIndex) {
+                        cardEl.onclick = () => equipStatus(card);
+                    }
+                    container.appendChild(cardEl);
+                });
+            }
+        }
+
+        // 出牌
         function playCard(cardName) {
-            if (!gameState || gameState.current_idx !== myIndex) return alert("🚨 现在不是你的出牌回合！");
-            if (gameState.is_my_response) return alert("🚨 请先处理当前的防御响应！");
-            if (["攻", "荆轲刺秦", "一字马", "顺手牵羊", "江山易主", "同归于尽"].includes(cardName)) {
-                if (selectedTargetIdx === -1) return alert("🚨 请先在上方点击选定一个其他存活玩家作为打击目标！");
+            if (gameState.current_idx !== myIndex) return;
+            const needTarget = ['攻', '荆轲刺秦', '一字马', '顺手牵羊', '江山易主', '同归于尽'].includes(cardName);
+            if (needTarget && selectedTargetIdx === -1) {
+                showToast('请先选择一个目标玩家！');
+                return;
             }
             socket.emit('play_card', { card: cardName, target: selectedTargetIdx });
         }
 
+        // 暗度陈仓变形出牌
         function playAnduxu(cardName, realIntent) {
-            if (!gameState || gameState.current_idx !== myIndex) return alert("🚨 现在不是你的出牌回合！");
-            if (selectedTargetIdx === -1) return alert("🚨 【暗度陈仓】变形打击也必须在上方点击选择一个目标！");
+            if (gameState.current_idx !== myIndex) return;
+            if (selectedTargetIdx === -1) {
+                showToast('请先选择一个目标玩家！');
+                return;
+            }
             socket.emit('play_card', { card: cardName, target: selectedTargetIdx, intent: realIntent });
         }
 
+        // 装备状态牌
         function equipStatus(cardName) {
-            if (!gameState || gameState.current_idx !== myIndex) return alert("🚨 只能在自己的出牌回合装备状态牌！");
-            if (currentStatusCooldown > 0) return alert("🚨 当前状态还在冷却中，无法更换！");
+            if (gameState.current_idx !== myIndex) return;
             socket.emit('equip_status', { card: cardName });
         }
 
-        function respond(type) { socket.emit('respond_action', { type: type }); }
-        function beishuiChoose(sacrificeVal) { socket.emit('beishui_decision', { sacrifice: sacrificeVal }); }
-        
+        // 显示防御提示
+        function showDefensePrompt(pendingCard, requiredDefenses) {
+            const panel = document.getElementById('prompt-panel');
+            const title = document.getElementById('prompt-title');
+            const buttons = document.getElementById('prompt-buttons');
+
+            title.textContent = `⚔️ 对方对你使用【${pendingCard}】，还需 ${requiredDefenses} 张防`;
+            buttons.innerHTML = '';
+
+            const myCards = gameState.my_cards;
+            const myStatus = gameState.my_status;
+
+            // 防
+            const hasDefense = myCards.includes('防');
+            const defBtn = document.createElement('button');
+            defBtn.className = 'prompt-btn defense';
+            defBtn.textContent = '🛡️ 出防';
+            defBtn.disabled = !hasDefense || !['攻', '荆轲刺秦'].includes(pendingCard);
+            defBtn.onclick = () => respond('防');
+            buttons.appendChild(defBtn);
+
+            // 暗度陈仓：攻当防
+            if (myStatus === '暗度陈仓' && myCards.includes('攻') && ['攻', '荆轲刺秦'].includes(pendingCard)) {
+                const adqBtn = document.createElement('button');
+                adqBtn.className = 'prompt-btn defense';
+                adqBtn.textContent = '🎭 攻当防';
+                adqBtn.onclick = () => respond('攻_as_防');
+                buttons.appendChild(adqBtn);
+            }
+
+            // 长城
+            const hasGreatwall = myCards.includes('长城');
+            const gwBtn = document.createElement('button');
+            gwBtn.className = 'prompt-btn greatwall';
+            gwBtn.textContent = '🧱 长城';
+            gwBtn.disabled = !hasGreatwall;
+            gwBtn.onclick = () => respond('长城');
+            buttons.appendChild(gwBtn);
+
+            // 放弃
+            const giveupBtn = document.createElement('button');
+            giveupBtn.className = 'prompt-btn giveup';
+            giveupBtn.textContent = '💔 放弃';
+            giveupBtn.onclick = () => respond('放弃');
+            buttons.appendChild(giveupBtn);
+
+            panel.style.display = 'block';
+        }
+
+        // 隐藏防御提示
+        function hideDefensePrompt() {
+            document.getElementById('prompt-panel').style.display = 'none';
+        }
+
+        // 响应防御
+        function respond(type) {
+            socket.emit('respond_action', { type: type });
+        }
+
+        // 背水一战提示
+        function showBeishuiPrompt() {
+            const panel = document.getElementById('prompt-panel');
+            const title = document.getElementById('prompt-title');
+            const buttons = document.getElementById('prompt-buttons');
+
+            const myHp = gameState.players[myIndex].hp;
+            title.textContent = `🩸 背水一战！献祭血量换取更多手牌（当前血量：${myHp}）`;
+            buttons.innerHTML = '';
+
+            const options = document.createElement('div');
+            options.className = 'beishui-options';
+
+            for (let i = 0; i <= Math.min(myHp - 1, 3); i++) {
+                const btn = document.createElement('button');
+                btn.className = 'beishui-btn';
+                btn.textContent = i === 0 ? '不献祭' : `献祭 ${i} 血（抽 ${i+1} 张）`;
+                btn.onclick = () => beishuiChoose(i);
+                options.appendChild(btn);
+            }
+
+            buttons.appendChild(options);
+            panel.style.display = 'block';
+        }
+
+        // 背水一战选择
+        function beishuiChoose(sacrificeVal) {
+            socket.emit('beishui_decision', { sacrifice: sacrificeVal });
+        }
+
+        // 结束回合
         function endTurn() {
-            if (!gameState || gameState.current_idx !== myIndex) return alert("🚨 现在不是你的回合！");
+            if (gameState.current_idx !== myIndex) return;
             socket.emit('end_turn');
         }
 
-        socket.on('lobby_update', (data) => {
-            document.getElementById("lobby-status").innerHTML = `
-                <p style="font-size:14px; margin-bottom:8px;">⚔️ 游戏大厅真人：<b>${data.count} / ${3 - data.bot_count}</b> (补齐 ${data.bot_count} 个人机即可自动开启)</p>
-                <div style="margin-top:8px;">已就绪真人：${data.players.length > 0 ? data.players.map(p => `<span style="background:#0f4c81; padding:4px 8px; border-radius:4px; margin-right:5px; font-weight:bold;">${p.name}</span>`).join(' ') : '无'}</div>
-            `;
-            document.getElementById("bot-select").value = data.bot_count;
-        });
-
-        socket.on('game_update', (data) => {
-            gameState = data;
-            document.getElementById("lobby").style.display = "none";
-            document.getElementById("game-board").style.display = "block";
-            document.getElementById("player-interaction").style.display = "block";
-            document.getElementById("victory-modal").style.display = "none";
-            if (data.my_idx !== undefined) myIndex = data.my_idx;
-            const activePlayerName = data.players[data.current_idx] ? data.players[data.current_idx].name : "未知";
-            const isMyTurn = (data.current_idx === myIndex);
-            document.getElementById("game-meta").innerHTML = `
-                <span><b>第 ${data.round} 轮</b></span> |
-                <span style="color:#ffb423;">当前行动：<b>${activePlayerName}</b></span> |
-                <span>剩余行动力：<b>${data.actions_left}</b></span> |
-                <span>基本牌堆：${data.deck_count} 张</span>
-            `;
-            const titleAnchor = document.getElementById("action-turn-title");
-            if (isMyTurn) {
-                titleAnchor.innerHTML = "🟢 【现在是你的出牌回合】请选择可用卡牌进行打击：";
-                titleAnchor.style.color = "#00fff0";
-            } else {
-                titleAnchor.innerHTML = `🟡 【等待中】当前轮到 ${activePlayerName} 作出行动...`;
-                titleAnchor.style.color = "#ffb423";
-            }
-            const anchor = document.getElementById('players-anchor');
-            anchor.innerHTML = '';
-            let targetStillValid = false;
-            data.players.forEach(p => {
-                const isMe = p.idx === myIndex;
-                let classStr = "player-card";
-                if(!p.alive) classStr += " dead";
-                if(data.current_idx === p.idx && p.alive) classStr += " active-turn";
-                if(selectedTargetIdx === p.idx && p.alive && !isMe) {
-                    classStr += " selected-target";
-                    targetStillValid = true;
-                }
-                anchor.innerHTML += `
-                    <div id="pcard-${p.idx}" class="${classStr}" onclick="selectTarget(${p.idx})">
-                        <div class="p-header">
-                            <span class="p-name">${p.name} ${isMe ? '(你)' : ''}</span>
-                            <span class="faction-tag fac-${p.faction}">${p.faction}</span>
-                        </div>
-                        <div class="hp-bar">HP: ${p.hp} / ${p.max_hp}</div>
-                        <div style="font-size: 11px; margin-top: 5px;">手牌数: ${p.hand_count}</div>
-                        <span class="status-badge st-${p.status}">${p.status} ${p.status_cooldown > 0 ? `(CD:${p.status_cooldown})` : ''}</span>
-                    </div>
-                `;
-            });
-            
-            if(!targetStillValid) selectedTargetIdx = -1;
-            const promptZone = document.getElementById('prompt-zone');
-            promptZone.innerHTML = '';
-            
-            if (data.is_beishui_prompt) {
-                promptZone.innerHTML = `
-                    <div class="prompt-panel">
-                        <div class="prompt-title">🩸 【背水一战】发动！请选择献祭生命值（强制抽牌）</div>
-                        <div class="prompt-btns">
-                            <button class="btn-action" onclick="beishuiChoose(0)">不自残 (补至5张)</button>
-                            <button class="btn-action" style="background:#d63031;" onclick="beishuiChoose(1)">自残 1 血 (抽 2 张)</button>
-                            <button class="btn-action" style="background:#c23616;" onclick="beishuiChoose(2)">自残 2 血 (抽 3 张)</button>
-                            <button class="btn-action" style="background:#8c1010;" onclick="beishuiChoose(3)">自残 3 血 (抽 4 张)</button>
-                        </div>
-                    </div>
-                `;
-            } else if (data.is_my_response) {
-                let defBtns = `<button class="btn-action" onclick="respond('放弃')">放弃抵抗 (受击)</button>`;
-                if (data.my_cards.includes("长城")) {
-                    defBtns += `<button class="btn-action" style="background:#0984e3;" onclick="respond('长城')">打出【长城】绝对免疫！</button>`;
-                }
-                if (["攻", "荆轲刺秦"].includes(data.pending_card)) {
-                    if (data.my_cards.includes("防")) {
-                        defBtns += `<button class="btn-action" style="background:#00b894;" onclick="respond('防')">打出【防】格挡 (还需 ${data.required_defenses} 张)</button>`;
-                    }
-                    if (data.my_status === "暗度陈仓" && data.my_cards.includes("攻")) {
-                        defBtns += `<button class="btn-action" style="background:#e1b12c; color:#000;" onclick="respond('攻_as_防')">暗度陈仓：将【攻】当【防】打出！</button>`;
-                    }
-                }
-                promptZone.innerHTML = `
-                    <div class="prompt-panel">
-                        <div class="prompt-title">🚨 警报！你遭到了【${data.pending_card}】的针对！请作出响应</div>
-                        <div class="prompt-btns">${defBtns}</div>
-                    </div>
-                `;
-            }
-            const handAnchor = document.getElementById("basic-hand-anchor");
-            handAnchor.innerHTML = '';
-            let canPlay = isMyTurn && !data.is_beishui_prompt && !data.is_my_response && data.actions_left > 0;
-            currentStatusCooldown = data.players.find(p => p.idx === myIndex).status_cooldown;
-            data.my_cards.forEach(card => {
-                let btn = `<button class="card-item" onclick="playCard('${card}')" ${!canPlay ? 'disabled' : ''}>${card}</button>`;
-                if (card === "防" && data.my_status === "暗度陈仓" && canPlay) {
-                    btn = `<div style="display:flex; flex-direction:column; gap:2px;">
-                        <button class="card-item" onclick="playCard('${card}')" disabled>${card}</button>
-                        <button class="card-item" style="background:#e1b12c; color:#000; font-size:13px; padding:8px;" onclick="playAnduxu('防', '攻')">当攻打</button>
-                    </div>`;
-                }
-                handAnchor.innerHTML += btn;
-            });
-            const statusAnchor = document.getElementById("status-hand-anchor");
-            statusAnchor.innerHTML = '';
-            data.my_status_cards.forEach(card => {
-                let canEquip = canPlay && currentStatusCooldown === 0;
-                statusAnchor.innerHTML += `<button class="card-item st-card-item" onclick="equipStatus('${card}')" ${!canEquip ? 'disabled' : ''}>${card}</button>`;
-            });
-        });
-
+        // 日志
         socket.on('log', (data) => {
-            const box = document.getElementById("log-box");
-            box.innerHTML += `<div class="log-line">${data.msg}</div>`;
-            box.scrollTop = box.scrollHeight;
+            const logContent = document.getElementById('log-content');
+            const logItem = document.createElement('div');
+            logItem.className = 'log-item';
+            logItem.textContent = data.msg;
+            logContent.appendChild(logItem);
+            logContent.scrollTop = logContent.scrollHeight;
         });
 
-        socket.on('action_error', (data) => alert(data.msg));
+        // 错误提示
+        socket.on('action_error', (data) => {
+            showToast(data.msg);
+        });
 
+        function showToast(msg) {
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.textContent = msg;
+            document.body.appendChild(toast);
+            setTimeout(() => { toast.remove(); }, 2500);
+        }
+
+        // 游戏结束
         socket.on('game_over', (data) => {
-            document.getElementById("victory-title").textContent = `🏆 ${data.winner} 胜出 🏆`;
-            document.getElementById("victory-msg").textContent = data.msg;
-            document.getElementById("victory-modal").style.display = "flex";
-            document.getElementById("player-interaction").style.display = "none";
+            document.getElementById('victory-title').textContent = '🏆 ' + data.winner + ' 胜利！';
+            document.getElementById('victory-msg').textContent = data.msg;
+            document.getElementById('victory-modal').style.display = 'flex';
         });
-
-        socket.on('force_reload_all', () => window.location.reload());
     </script>
 </body>
 </html>
