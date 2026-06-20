@@ -301,7 +301,7 @@ def execute_defense_response(idx, resp_type):
     blocked_by_greatwall = False
     if resp_type == '长城' and "长城" in p['hand']:
         p['hand'].remove("长城")
-        add_log(f"🧱 机器人【{p['name']}】祭出高耸【长城壁】！完美格挡了本次针对其发动的【{card_name}】效果！")
+        add_log(f"🧱 机器人【{p['name']}】祭出高耸【长城】！完美格挡了本次针对其发动的【{card_name}】效果！")
         blocked_by_greatwall = True
         game.pending_action = None
     elif resp_type == '防' and "防" in p['hand'] and card_name in ["攻", "荆轲刺秦"]:
@@ -354,7 +354,7 @@ def execute_play_card(src_idx, card_to_spend, card_to_execute, tgt_idx):
     if src['status'] == "卧薪尝胆" and card_to_execute != "回血":
         if src['hp'] > 1:
             src['hp'] -= 1
-            add_log(f"🔥 【{src['name']}】卧薪尝胆反噬，执念自损1血！(剩余:{src['hp']}/{src['max_hp']})")
+            add_log(f"🔥 【{src['name']}】卧薪尝胆反噬，自损1血！(剩余:{src['hp']}/{src['max_hp']})")
         else:
             add_log(f"🔥 【{src['name']}】卧薪尝胆反噬，但血量已为保底1血，不触发致死。")
     if card_to_execute in ["回血", "卡牌大师"]:
@@ -472,7 +472,7 @@ def damage_player(idx, amount, reason=""):
         p['faction_revealed'] = True
         for all_p in game.players:
             all_p['faction_revealed'] = True
-        add_log(f"🔥✨ 守护神【丁】血限归零！原地浴火复活！生命值回满并补充 3 张牌，全场身份自此大白于天下！")
+        add_log(f"🔥✨ 守护神【丁】血限归零！原地复活！生命值回满并补充 3 张牌，全场身份自此大白于天下！")
         draw_cards(idx, 3)
         for other_p in game.players:
             if other_p['alive'] and other_p['faction'] == "司":
@@ -482,7 +482,7 @@ def damage_player(idx, amount, reason=""):
         p['hp'] = 0
         p['alive'] = False
         p['faction_revealed'] = True
-        add_log(f"💀🪦 【{p['name']}】力战阵亡！其隐藏身份最终揭开：【{p['faction']}】")
+        add_log(f"💀🪦 【{p['name']}】力战阵亡！其身份最终揭开：【{p['faction']}】")
         p['hand'] = []
         p['status_cards'] = []
         p['status'] = "正常"
@@ -496,7 +496,7 @@ def check_victory_conditions():
         add_log("🏆👑 【司】胜利！主星【冀】已遭到灭杀！")
         socketio.emit('game_over', {
             "winner": "司 (叛逆者)",
-            "msg": "【司】成功击杀主星【冀】，击溃了丁卫盟，获得独立决战的最终胜利！"
+            "msg": "【司】成功击杀主星【冀】，击溃了【冀+丁】联盟，获得独立决战的最终胜利！"
         })
         return
     if not si_alive:
@@ -504,7 +504,7 @@ def check_victory_conditions():
         add_log("🏆🌟 【冀+丁】盟友阵营大捷！叛逆者【司】已经被全部清除！")
         socketio.emit('game_over', {
             "winner": "冀 + 丁 (守护联盟)",
-            "msg": "主星【冀】与护卫【丁】成功将【司】绳之以法，完美守护了星域和平！"
+            "msg": "主星【冀】与护卫【丁】成功将【司】绳之以法，完美守护了和平！"
         })
         return
 
@@ -533,7 +533,7 @@ def on_join_game(data):
             broadcast_state()
             return
         else:
-            emit('action_error', {'msg': '🚨 对战正在热血搏弈中！且大厅没有你的原战魂名，无法中途加入。'})
+            emit('action_error', {'msg': '🚨 对战正在热血搏弈中！且大厅没有你的名字，无法中途加入。'})
             return
     game.players = [p for p in game.players if not p.get('is_bot', False)]
     existing_lobby = next((p for p in game.players if p['name'] == name), None)
