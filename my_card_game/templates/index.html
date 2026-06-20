@@ -189,6 +189,15 @@
             padding: 6px 0;
             color: #00fff0;
         }
+        .lobby-tip {
+            margin-top: 15px;
+            padding: 10px;
+            background: rgba(255, 180, 35, 0.1);
+            border: 1px solid #ffb423;
+            border-radius: 6px;
+            font-size: 13px;
+            color: #ffb423;
+        }
 
         /* 玩家卡片 */
         .players-container {
@@ -749,6 +758,9 @@
                     <div>已在大厅：<span id="lobby-count">0</span> 人</div>
                     <div class="player-list" id="lobby-players"></div>
                 </div>
+                <div class="lobby-tip" id="lobby-tip" style="display:none;">
+                    💡 游戏进行中，输入原来的昵称可以断线重连
+                </div>
             </div>
 
             <!-- 游戏界面（初始隐藏） -->
@@ -901,8 +913,13 @@
             playersEl.innerHTML = data.players.map(p => 
                 '<div class="player-item">👤 ' + p.name + '</div>'
             ).join('');
+            // 游戏进行中时，显示重连提示
             if (data.game_active) {
-                document.getElementById('lobby-box').style.display = 'none';
+                document.getElementById('lobby-tip').style.display = 'block';
+                document.getElementById('bot-count').disabled = true;
+            } else {
+                document.getElementById('lobby-tip').style.display = 'none';
+                document.getElementById('bot-count').disabled = false;
             }
         });
 
