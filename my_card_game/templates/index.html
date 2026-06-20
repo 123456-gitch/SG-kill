@@ -102,7 +102,7 @@
         /* 左侧战斗区 */
         .battle-area {
             flex: 1;
-            padding: 20px;
+            padding: 20px 20px 350px 20px;
             overflow-y: auto;
             position: relative;
         }
@@ -202,25 +202,25 @@
         /* 玩家卡片 */
         .players-container {
             display: flex;
-            justify-content: space-around;
+            justify-content: center;
             align-items: flex-start;
             margin-bottom: 20px;
             flex-wrap: wrap;
-            gap: 15px;
+            gap: 20px;
         }
         .player-card {
-            width: 200px;
+            width: 160px;
             background: rgba(0, 0, 0, 0.5);
             border: 2px solid #444;
             border-radius: 12px;
-            padding: 15px;
+            padding: 12px;
             text-align: center;
-            transition: 0.3s;
+            transition: 0.2s;
             position: relative;
         }
         .player-card.current-turn {
             border-color: #ffb423;
-            box-shadow: 0 0 25px rgba(255, 180, 35, 0.5);
+            box-shadow: 0 0 20px rgba(255, 180, 35, 0.5);
             transform: scale(1.05);
         }
         .player-card.dead {
@@ -229,31 +229,44 @@
         }
         .player-card.is-me {
             border-color: #00fff0;
-            box-shadow: 0 0 20px rgba(0, 255, 240, 0.4);
+            box-shadow: 0 0 15px rgba(0, 255, 240, 0.4);
+        }
+        .player-card.selectable {
+            cursor: pointer;
+        }
+        .player-card.selectable:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(255, 180, 35, 0.4);
+            border-color: #ffb423;
+        }
+        .player-card.selected-target {
+            border-color: #ffb423;
+            box-shadow: 0 0 25px #ffb423, 0 0 50px rgba(255, 180, 35, 0.5);
+            transform: scale(1.08);
         }
         .player-card .player-name {
-            font-size: 18px;
+            font-size: 15px;
             font-weight: bold;
-            margin-bottom: 8px;
+            margin-bottom: 6px;
             color: #fff;
         }
         .player-card .faction {
-            font-size: 14px;
-            padding: 3px 10px;
+            font-size: 12px;
+            padding: 2px 8px;
             border-radius: 4px;
             display: inline-block;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
         }
         .faction.si { background: #ff4444; color: #fff; }
         .faction.ji { background: #4488ff; color: #fff; }
         .faction.ding { background: #44ff88; color: #000; }
         .faction.hidden { background: #666; color: #fff; }
         .player-card .hp-bar {
-            height: 20px;
+            height: 16px;
             background: #333;
-            border-radius: 10px;
+            border-radius: 8px;
             overflow: hidden;
-            margin-bottom: 6px;
+            margin-bottom: 4px;
             border: 1px solid #555;
         }
         .player-card .hp-fill {
@@ -262,50 +275,38 @@
             transition: width 0.3s;
         }
         .player-card .hp-text {
-            font-size: 13px;
+            font-size: 12px;
             color: #ff8844;
-            margin-bottom: 8px;
+            margin-bottom: 6px;
         }
         .player-card .status-tag {
-            font-size: 12px;
-            padding: 3px 8px;
+            font-size: 11px;
+            padding: 2px 6px;
             border-radius: 4px;
             background: linear-gradient(135deg, #667eea, #764ba2);
             display: inline-block;
-            margin-top: 5px;
+            margin-top: 4px;
         }
         .player-card .hand-count {
-            font-size: 13px;
-            color: #aaa;
-            margin-top: 8px;
-        }
-        .player-card .target-btn {
-            margin-top: 10px;
-            padding: 6px 12px;
-            background: linear-gradient(135deg, #ff6b6b, #ee5a52);
-            border: none;
-            border-radius: 5px;
-            color: white;
-            cursor: pointer;
             font-size: 12px;
-            transition: 0.2s;
+            color: #aaa;
+            margin-top: 6px;
         }
-        .player-card .target-btn:hover {
-            transform: scale(1.05);
+        .select-hint {
+            text-align: center;
+            color: #ffb423;
+            font-size: 13px;
+            margin-bottom: 10px;
+            animation: blink 1.5s infinite;
         }
-        .player-card .target-btn.selected {
-            background: linear-gradient(135deg, #ffb423, #ff8800);
-            box-shadow: 0 0 15px rgba(255, 180, 35, 0.6);
-        }
-        .player-card .target-btn:disabled {
-            background: #555;
-            cursor: not-allowed;
-            opacity: 0.5;
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
         }
 
         /* 提示面板 */
         .prompt-panel {
-            max-width: 500px;
+            max-width: 600px;
             margin: 20px auto;
             background: rgba(255, 180, 35, 0.15);
             border: 2px solid #ffb423;
@@ -321,7 +322,7 @@
         .prompt-panel h3 {
             color: #ffb423;
             margin-bottom: 15px;
-            font-size: 18px;
+            font-size: 17px;
         }
         .prompt-panel .prompt-buttons {
             display: flex;
@@ -364,51 +365,54 @@
         .beishui-options {
             display: flex;
             justify-content: center;
-            gap: 8px;
-            flex-wrap: wrap;
+            gap: 12px;
+            flex-wrap: nowrap;
         }
         .beishui-btn {
-            padding: 8px 16px;
+            padding: 10px 18px;
             background: linear-gradient(135deg, #ff6b6b, #ee5a52);
             border: none;
             border-radius: 6px;
             color: white;
             cursor: pointer;
             font-weight: bold;
+            font-size: 14px;
             transition: 0.2s;
+            white-space: nowrap;
         }
         .beishui-btn:hover {
             transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(255, 107, 107, 0.5);
         }
 
         /* 右侧日志区 */
         .log-sidebar {
-            width: 320px;
+            width: 260px;
             background: rgba(0, 0, 0, 0.4);
             border-left: 2px solid #00fff0;
             display: flex;
             flex-direction: column;
         }
         .log-sidebar h3 {
-            padding: 15px;
+            padding: 12px;
             color: #00fff0;
             border-bottom: 1px solid #00fff0;
-            font-size: 16px;
+            font-size: 15px;
         }
         .log-content {
             flex: 1;
             overflow-y: auto;
-            padding: 10px 15px;
-            font-size: 13px;
-            line-height: 1.8;
+            padding: 8px 12px;
+            font-size: 12px;
+            line-height: 1.7;
         }
         .log-content .log-item {
-            margin-bottom: 6px;
+            margin-bottom: 4px;
             color: #ccc;
             border-bottom: 1px dashed #333;
-            padding-bottom: 4px;
+            padding-bottom: 3px;
         }
-        .log-content::-webkit-scrollbar { width: 6px; }
+        .log-content::-webkit-scrollbar { width: 5px; }
         .log-content::-webkit-scrollbar-track { background: #1a1a2e; }
         .log-content::-webkit-scrollbar-thumb { background: #00fff0; border-radius: 3px; }
 
@@ -417,42 +421,43 @@
             position: fixed;
             bottom: 0;
             left: 0;
-            right: 320px;
+            right: 260px;
             background: rgba(0, 0, 0, 0.7);
             border-top: 2px solid #ffb423;
-            padding: 20px 25px;
-            min-height: 280px;
+            padding: 15px 20px;
+            min-height: 260px;
             box-shadow: 0 -4px 30px rgba(255, 180, 35, 0.2);
         }
         .bottom-panel .hand-section {
             display: flex;
             align-items: flex-start;
             gap: 20px;
+            padding-right: 150px;
         }
         .bottom-panel .status-section {
-            width: 320px;
+            width: 280px;
             flex-shrink: 0;
         }
         .bottom-panel .status-section h4 {
             color: #ffb423;
-            margin-bottom: 10px;
-            font-size: 14px;
+            margin-bottom: 8px;
+            font-size: 13px;
         }
         .status-cards {
             display: flex;
-            gap: 10px;
+            gap: 8px;
             flex-wrap: wrap;
         }
         .status-card {
-            padding: 10px 15px;
+            padding: 8px 12px;
             background: linear-gradient(135deg, #667eea, #764ba2);
-            border-radius: 8px;
+            border-radius: 7px;
             cursor: pointer;
-            font-size: 13px;
+            font-size: 12px;
             font-weight: bold;
             transition: 0.2s;
             text-align: center;
-            min-width: 90px;
+            min-width: 80px;
         }
         .status-card:hover {
             transform: translateY(-3px);
@@ -463,9 +468,9 @@
             cursor: not-allowed;
         }
         .status-card .cooldown-text {
-            font-size: 11px;
+            font-size: 10px;
             color: #ffb423;
-            margin-top: 3px;
+            margin-top: 2px;
         }
 
         .hand-cards {
@@ -475,7 +480,7 @@
             flex-wrap: wrap;
         }
         #basic-hand-anchor {
-            max-height: 230px;
+            max-height: 200px;
             overflow-y: auto;
             padding-right: 8px;
             scrollbar-width: thin;
@@ -549,15 +554,15 @@
 
         .end-turn-btn {
             position: absolute;
-            right: 25px;
+            right: 20px;
             top: 50%;
             transform: translateY(-50%);
-            padding: 20px 32px;
+            padding: 18px 28px;
             background: linear-gradient(135deg, #ffb423, #ff8800);
             border: none;
             border-radius: 10px;
             color: #000;
-            font-size: 17px;
+            font-size: 16px;
             font-weight: bold;
             cursor: pointer;
             transition: 0.2s;
@@ -765,6 +770,9 @@
 
             <!-- 游戏界面（初始隐藏） -->
             <div id="game-ui" style="display:none;">
+                <div class="select-hint" id="select-hint" style="display:none;">
+                    👆 点击下方玩家卡片选择目标
+                </div>
                 <div class="players-container" id="players-container"></div>
                 <div class="prompt-panel" id="prompt-panel" style="display:none;">
                     <h3 id="prompt-title">请选择</h3>
@@ -788,7 +796,7 @@
                 <div class="status-cards" id="status-cards"></div>
             </div>
             <div style="flex:1;">
-                <h4 style="color:#00fff0; margin-bottom:10px; font-size:14px;">🃏 手牌</h4>
+                <h4 style="color:#00fff0; margin-bottom:8px; font-size:13px;">🃏 手牌</h4>
                 <div class="hand-cards" id="basic-hand-anchor"></div>
             </div>
         </div>
@@ -871,6 +879,20 @@
         let gameState = null;
         let isConnected = false;
 
+        // 牌的分类排序顺序
+        const cardOrder = {
+            '攻': 1,
+            '荆轲刺秦': 2,
+            '同归于尽': 3,
+            '防': 4,
+            '长城': 5,
+            '回血': 6,
+            '卡牌大师': 7,
+            '一字马': 8,
+            '顺手牵羊': 9,
+            '江山易主': 10
+        };
+
         // 更新连接状态
         function updateConnStatus(status, text) {
             const el = document.getElementById('conn-status');
@@ -913,7 +935,6 @@
             playersEl.innerHTML = data.players.map(p => 
                 '<div class="player-item">👤 ' + p.name + '</div>'
             ).join('');
-            // 游戏进行中时，显示重连提示
             if (data.game_active) {
                 document.getElementById('lobby-tip').style.display = 'block';
                 document.getElementById('bot-count').disabled = true;
@@ -973,7 +994,7 @@
             // 渲染玩家卡片
             renderPlayers(state.players);
 
-            // 渲染手牌
+            // 渲染手牌（自动归类排序）
             renderHand(state.my_cards, state.my_status);
 
             // 渲染状态牌
@@ -994,6 +1015,14 @@
             // 更新结束回合按钮状态
             const endBtn = document.getElementById('end-turn-btn');
             endBtn.disabled = (state.current_idx !== myIndex || state.is_my_response || state.is_beishui_prompt);
+
+            // 显示/隐藏选择目标提示
+            const selectHint = document.getElementById('select-hint');
+            if (state.current_idx === myIndex && !state.is_my_response && !state.is_beishui_prompt) {
+                selectHint.style.display = 'block';
+            } else {
+                selectHint.style.display = 'none';
+            }
         });
 
         // 渲染玩家卡片
@@ -1004,6 +1033,8 @@
                 const isMe = (idx === myIndex);
                 const isCurrent = (idx === gameState.current_idx);
                 const isDead = !p.alive;
+                const isMyTurn = (gameState.current_idx === myIndex);
+                const canSelect = (isMyTurn && !isMe && isDead === false && !gameState.is_my_response && !gameState.is_beishui_prompt);
 
                 let factionClass = 'hidden';
                 let factionText = '隐藏';
@@ -1014,12 +1045,13 @@
                 const hpPercent = Math.max(0, (p.hp / p.max_hp) * 100);
 
                 const card = document.createElement('div');
-                card.className = 'player-card' + (isCurrent ? ' current-turn' : '') + (isDead ? ' dead' : '') + (isMe ? ' is-me' : '');
-                
-                let targetBtnHtml = '';
-                if (!isDead && !isMe && gameState.current_idx === myIndex) {
-                    const btnText = selectedTargetIdx === idx ? '🎯 已选中' : '锁定目标';
-                    targetBtnHtml = `<button class="target-btn ${selectedTargetIdx === idx ? 'selected' : ''}" onclick="selectTarget(${idx})">${btnText}</button>`;
+                let cardClass = 'player-card' + (isCurrent ? ' current-turn' : '') + (isDead ? ' dead' : '') + (isMe ? ' is-me' : '');
+                if (canSelect) cardClass += ' selectable';
+                if (selectedTargetIdx === idx && canSelect) cardClass += ' selected-target';
+                card.className = cardClass;
+
+                if (canSelect) {
+                    card.onclick = () => selectTarget(idx);
                 }
 
                 card.innerHTML = `
@@ -1028,8 +1060,7 @@
                     <div class="hp-bar"><div class="hp-fill" style="width:${hpPercent}%"></div></div>
                     <div class="hp-text">${p.hp} / ${p.max_hp}</div>
                     ${p.status !== '正常' ? `<div class="status-tag">${p.status}${p.status_cooldown > 0 ? ' (' + p.status_cooldown + ')' : ''}</div>` : ''}
-                    <div class="hand-count">🃏 手牌 ${p.hand_count} 张</div>
-                    ${targetBtnHtml}
+                    <div class="hand-count">🃏 ${p.hand_count} 张</div>
                 `;
                 container.appendChild(card);
             });
@@ -1041,15 +1072,23 @@
             renderPlayers(gameState.players);
         }
 
-        // 渲染手牌
+        // 渲染手牌（自动归类排序）
         function renderHand(cards, myStatus) {
             const container = document.getElementById('basic-hand-anchor');
             container.innerHTML = '';
-            cards.forEach(card => {
+            
+            // 按类型归类排序
+            const sortedCards = [...cards].sort((a, b) => {
+                const orderA = cardOrder[a] || 99;
+                const orderB = cardOrder[b] || 99;
+                return orderA - orderB;
+            });
+
+            sortedCards.forEach(card => {
                 const cardEl = document.createElement('div');
                 let cardClass = 'hand-card';
                 if (['攻', '荆轲刺秦', '同归于尽'].includes(card)) cardClass += ' attack';
-                else if (['防'].includes(card)) cardClass += ' defense';
+                else if (['防', '长城'].includes(card)) cardClass += ' defense';
                 else if (['回血'].includes(card)) cardClass += ' heal';
                 else cardClass += ' special';
 
@@ -1108,7 +1147,7 @@
             if (gameState.current_idx !== myIndex) return;
             const needTarget = ['攻', '荆轲刺秦', '一字马', '顺手牵羊', '江山易主', '同归于尽'].includes(cardName);
             if (needTarget && selectedTargetIdx === -1) {
-                showToast('请先选择一个目标玩家！');
+                showToast('请先点击玩家卡片选择目标！');
                 return;
             }
             socket.emit('play_card', { card: cardName, target: selectedTargetIdx });
@@ -1118,7 +1157,7 @@
         function playAnduxu(cardName, realIntent) {
             if (gameState.current_idx !== myIndex) return;
             if (selectedTargetIdx === -1) {
-                showToast('请先选择一个目标玩家！');
+                showToast('请先点击玩家卡片选择目标！');
                 return;
             }
             socket.emit('play_card', { card: cardName, target: selectedTargetIdx, intent: realIntent });
