@@ -502,6 +502,8 @@ def damage_player(idx, amount, reason=""):
         p['hand'] = []
         p['status_cards'] = []
         p['status'] = "正常"
+        # 修复：玩家死亡后立即检查胜利条件，避免延迟弹出胜利弹窗
+        check_victory_conditions()
 
 def check_victory_conditions():
     if not game.active: return
@@ -540,7 +542,12 @@ def on_change_bot_count(data):
 def on_join_game(data):
     sid = request.sid
     name = data.get('name', '').strip()
-    if not name: name = f"玩家_{random.randint(100, 999)}"
+    if not name:
+        name = f"玩家_{random.randint(100, 999)}"
+    # 新增：昵称长度限制，最多15个字符
+    if len(name) > 15:
+        emit('action_error', {'msg': '🚨 昵称不能超过15个字符！'})
+        return
     if game.active:
         existing = next((p for p in game.players if p['name'] == name), None)
         if existing:
