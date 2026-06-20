@@ -333,6 +333,11 @@ def execute_defense_response(idx, resp_type):
             damage_player(src_idx, 1, "荆轲刺秦反噬自损")
             add_log(f"🗡️ 【{src_player['name']}】荆轲刺秦反噬：自损1点体力！")
     check_victory_conditions()
+    # 修复：防御结算后如果当前回合玩家死亡，自动结束回合（避免僵局）
+    if game.active and not game.players[game.current_idx]['alive'] and not game.pending_action:
+        add_log(f"⏭️ 回合主行动方【{game.players[game.current_idx]['name']}】阵亡，出牌阶段强制终止。")
+        next_turn()
+        return
     broadcast_state()
     if game.active and game.pending_action and game.pending_action['target_idx'] == idx:
         socketio.start_background_task(run_bot_defense, idx)
@@ -477,7 +482,7 @@ def damage_player(idx, amount, reason=""):
         p['hp'] = 0
         p['alive'] = False
         p['faction_revealed'] = True
-        add_log(f"💀🪦 【{p['name']}】力战阵亡！其身份最终揭开：【{p['faction']}】")
+        add_log(f"💀🪦 【{p['name']}】力战阵亡！其隐藏身份最终揭开：【{p['faction']}】")
         p['hand'] = []
         p['status_cards'] = []
         p['status'] = "正常"
@@ -491,7 +496,7 @@ def check_victory_conditions():
         add_log("🏆👑 【司】胜利！主星【冀】已遭到灭杀！")
         socketio.emit('game_over', {
             "winner": "司 (叛逆者)",
-            "msg": "【司】成功击杀主星【冀】，击溃了【冀+丁】联盟，获得独立决战的最终胜利！"
+            "msg": "【司】成功击杀主星【冀】，击溃了丁卫盟，获得独立决战的最终胜利！"
         })
         return
     if not si_alive:
@@ -499,7 +504,7 @@ def check_victory_conditions():
         add_log("🏆🌟 【冀+丁】盟友阵营大捷！叛逆者【司】已经被全部清除！")
         socketio.emit('game_over', {
             "winner": "冀 + 丁 (守护联盟)",
-            "msg": "主星【冀】与护卫【丁】成功将【司】绳之以法，完美守护了和平！"
+            "msg": "主星【冀】与护卫【丁】成功将【司】绳之以法，完美守护了星域和平！"
         })
         return
 
@@ -681,6 +686,11 @@ def on_respond_action(data):
             damage_player(src_idx, 1, "荆轲刺秦反噬自损")
             add_log(f"🗡️ 【{src_player['name']}】荆轲刺秦反噬：自损1点体力！")
     check_victory_conditions()
+    # 修复：防御结算后如果当前回合玩家死亡，自动结束回合（避免僵局）
+    if game.active and not game.players[game.current_idx]['alive'] and not game.pending_action:
+        add_log(f"⏭️ 回合主行动方【{game.players[game.current_idx]['name']}】阵亡，出牌阶段强制终止。")
+        next_turn()
+        return
     broadcast_state()
     if game.active and not game.pending_action:
         check_actions_and_end_turn()
