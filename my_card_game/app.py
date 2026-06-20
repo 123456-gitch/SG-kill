@@ -298,9 +298,11 @@ def execute_defense_response(idx, resp_type):
     src_idx = game.pending_action['source_idx']
     tgt_idx = game.pending_action['target_idx']
     was_pending = True
+    blocked_by_greatwall = False
     if resp_type == '长城' and "长城" in p['hand']:
         p['hand'].remove("长城")
         add_log(f"🧱 机器人【{p['name']}】祭出高耸【长城壁】！完美格挡了本次针对其发动的【{card_name}】效果！")
+        blocked_by_greatwall = True
         game.pending_action = None
     elif resp_type == '防' and "防" in p['hand'] and card_name in ["攻", "荆轲刺秦"]:
         p['hand'].remove("防")
@@ -324,8 +326,8 @@ def execute_defense_response(idx, resp_type):
             add_log(f"⏭️ 回合主行动方【{src_player['name']}】阵亡，出牌阶段强制终止。")
             next_turn()
             return
-    # 修复：荆轲刺秦无论是否被防住，结算完后使用者都要自损1血
-    if was_pending and not game.pending_action and card_name == "荆轲刺秦" and game.active:
+    # 修复：长城完全废掉整张牌，荆轲刺秦的自损反噬也不触发
+    if was_pending and not game.pending_action and card_name == "荆轲刺秦" and not blocked_by_greatwall and game.active:
         src_player = game.players[src_idx]
         if src_player['alive']:
             damage_player(src_idx, 1, "荆轲刺秦反噬自损")
@@ -497,7 +499,7 @@ def check_victory_conditions():
         add_log("🏆🌟 【冀+丁】盟友阵营大捷！叛逆者【司】已经被全部清除！")
         socketio.emit('game_over', {
             "winner": "冀 + 丁 (守护联盟)",
-            "msg": "主星【冀】与护卫【丁】成功将【司】绳之以法，完美守护了星域和平！"
+            "msg": "主星【冀】与护卫【丁】成功将【司】绳之以法，完美守护了和平！"
         })
         return
 
@@ -644,9 +646,11 @@ def on_respond_action(data):
     src_idx = game.pending_action['source_idx']
     tgt_idx = game.pending_action['target_idx']
     was_pending = True
+    blocked_by_greatwall = False
     if resp_type == '长城' and "长城" in p['hand']:
         p['hand'].remove("长城")
         add_log(f"🧱 【{p['name']}】祭出高耸【长城壁】！完美格挡了本次针对其发动的【{card_name}】效果！")
+        blocked_by_greatwall = True
         game.pending_action = None
     elif resp_type == '防' and "防" in p['hand'] and card_name in ["攻", "荆轲刺秦"]:
         p['hand'].remove("防")
@@ -670,8 +674,8 @@ def on_respond_action(data):
             add_log(f"⏭️ 回合主行动方【{src_player['name']}】阵亡，出牌阶段强制终止。")
             next_turn()
             return
-    # 修复：荆轲刺秦无论是否被防住，结算完后使用者都要自损1血
-    if was_pending and not game.pending_action and card_name == "荆轲刺秦" and game.active:
+    # 修复：长城完全废掉整张牌，荆轲刺秦的自损反噬也不触发
+    if was_pending and not game.pending_action and card_name == "荆轲刺秦" and not blocked_by_greatwall and game.active:
         src_player = game.players[src_idx]
         if src_player['alive']:
             damage_player(src_idx, 1, "荆轲刺秦反噬自损")
