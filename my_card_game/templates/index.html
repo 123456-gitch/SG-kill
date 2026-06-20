@@ -1199,25 +1199,30 @@
             const myCards = gameState.my_cards;
             const myStatus = gameState.my_status;
 
-            // 防
-            const hasDefense = myCards.includes('防');
-            const defBtn = document.createElement('button');
-            defBtn.className = 'prompt-btn defense';
-            defBtn.textContent = '🛡️ 出防';
-            defBtn.disabled = !hasDefense || !['攻', '荆轲刺秦'].includes(pendingCard);
-            defBtn.onclick = () => respond('防');
-            buttons.appendChild(defBtn);
+            // 只有攻和荆轲刺秦才能出防
+            const isAttackCard = ['攻', '荆轲刺秦'].includes(pendingCard);
 
-            // 暗度陈仓：攻当防
-            if (myStatus === '暗度陈仓' && myCards.includes('攻') && ['攻', '荆轲刺秦'].includes(pendingCard)) {
-                const adqBtn = document.createElement('button');
-                adqBtn.className = 'prompt-btn defense';
-                adqBtn.textContent = '🎭 攻当防';
-                adqBtn.onclick = () => respond('攻_as_防');
-                buttons.appendChild(adqBtn);
+            if (isAttackCard) {
+                // 防
+                const hasDefense = myCards.includes('防');
+                const defBtn = document.createElement('button');
+                defBtn.className = 'prompt-btn defense';
+                defBtn.textContent = '🛡️ 出防';
+                defBtn.disabled = !hasDefense;
+                defBtn.onclick = () => respond('防');
+                buttons.appendChild(defBtn);
+
+                // 暗度陈仓：攻当防
+                if (myStatus === '暗度陈仓' && myCards.includes('攻')) {
+                    const adqBtn = document.createElement('button');
+                    adqBtn.className = 'prompt-btn defense';
+                    adqBtn.textContent = '🎭 攻当防';
+                    adqBtn.onclick = () => respond('攻_as_防');
+                    buttons.appendChild(adqBtn);
+                }
             }
 
-            // 长城
+            // 长城（所有牌都可以出长城）
             const hasGreatwall = myCards.includes('长城');
             const gwBtn = document.createElement('button');
             gwBtn.className = 'prompt-btn greatwall';
