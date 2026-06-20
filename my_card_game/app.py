@@ -475,7 +475,7 @@ def damage_player(idx, amount, reason=""):
         p['hp'] = 0
         p['alive'] = False
         p['faction_revealed'] = True
-        add_log(f"💀🪦 【{p['name']}】力战阵亡！其隐藏身份最终揭开：【{p['faction']}】")
+        add_log(f"💀🪦 【{p['name']}】力战阵亡！其身份最终揭开：【{p['faction']}】")
         p['hand'] = []
         p['status_cards'] = []
         p['status'] = "正常"
@@ -489,7 +489,7 @@ def check_victory_conditions():
         add_log("🏆👑 【司】胜利！主星【冀】已遭到灭杀！")
         socketio.emit('game_over', {
             "winner": "司 (叛逆者)",
-            "msg": "【司】成功击杀主星【冀】，击溃了丁卫盟，获得独立决战的最终胜利！"
+            "msg": "【司】成功击杀主星【冀】，击溃了【冀+丁】联盟，获得独立决战的最终胜利！"
         })
         return
     if not si_alive:
