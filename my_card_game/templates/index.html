@@ -998,6 +998,13 @@
 
                 const card = document.createElement('div');
                 card.className = 'player-card' + (isCurrent ? ' current-turn' : '') + (isDead ? ' dead' : '') + (isMe ? ' is-me' : '');
+                
+                let targetBtnHtml = '';
+                if (!isDead && !isMe && gameState.current_idx === myIndex) {
+                    const btnText = selectedTargetIdx === idx ? '🎯 已选中' : '锁定目标';
+                    targetBtnHtml = `<button class="target-btn ${selectedTargetIdx === idx ? 'selected' : ''}" onclick="selectTarget(${idx})">${btnText}</button>`;
+                }
+
                 card.innerHTML = `
                     <div class="player-name">${p.name}${isMe ? ' (你)' : ''}${isCurrent ? ' 👑' : ''}</div>
                     <div class="faction ${factionClass}">${factionText}</div>
@@ -1005,10 +1012,7 @@
                     <div class="hp-text">${p.hp} / ${p.max_hp}</div>
                     ${p.status !== '正常' ? `<div class="status-tag">${p.status}${p.status_cooldown > 0 ? ' (' + p.status_cooldown + ')' : ''}</div>` : ''}
                     <div class="hand-count">🃏 手牌 ${p.hand_count} 张</div>
-                    ${!isDead && !isMe && gameState.current_idx === myIndex ? 
-                        `<button class="target-btn ${selectedTargetIdx === idx ? 'selected' : ''}" onclick="selectTarget(${idx})">
-                            ${selectedTargetIdx === idx ? '🎯 已选中' '锁定目标'}
-                        </button>` : ''}
+                    ${targetBtnHtml}
                 `;
                 container.appendChild(card);
             });
