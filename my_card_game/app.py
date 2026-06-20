@@ -27,6 +27,7 @@ class GameEngine:
         self.round = 1
         self.actions_left = 0
         self.deck = []
+        self.discard_pile = []
         self.status_deck = []
         self.pending_action = None
         self.logs = []
@@ -45,6 +46,7 @@ def add_log(msg):
 def rebuild_decks():
     game.deck = list(BASIC_CARDS)
     random.shuffle(game.deck)
+    game.discard_pile = []
     game.status_deck = list(STATUS_CARDS)
     random.shuffle(game.status_deck)
 
@@ -54,8 +56,14 @@ def draw_cards(player_idx, count):
     drawn = []
     for _ in range(count):
         if not game.deck:
-            rebuild_decks()
-            add_log("🤹 [洗牌] 牌堆已空，重新混洗基本牌堆！")
+            if game.discard_pile:
+                game.deck.extend(game.discard_pile)
+                game.discard_pile = []
+                random.shuffle(game.deck)
+                add_log("🔄 牌堆已空，弃牌堆洗回牌库继续使用！")
+            else:
+                add_log("⚠️ 牌库和弃牌堆都空了，无法继续抽牌！")
+                break
         if game.deck:
             drawn.append(game.deck.pop(0))
     p['hand'].extend(drawn)
@@ -171,6 +179,11 @@ def start_turn(idx):
 def end_turn_logic():
     if not game.active: return
     add_log(f"🏁 【{game.players[game.current_idx]['name']}】回合宣告结束")
+    # 每回合结束：弃牌堆洗回牌库并重新洗牌
+    if game.discard_pile:
+        game.deck.extend(game.discard_pile)
+        game.discard_pile = []
+        random.shuffle(game.deck)
     for p in game.players:
         if p['alive'] and p['status_cooldown'] > 0:
             p['status_cooldown'] -= 1
@@ -197,7 +210,6 @@ def next_turn():
                 if cards_needed > 0:
                     draw_cards(player['idx'], cards_needed)
                     add_log(f"✋ 【{player['name']}】大轮次自动补充手牌 {cards_needed} 张")
-        if game.round % 2 == 1: rebuild_decks()
     start_turn(next_idx)
 
 def trigger_bot_if_needed():
@@ -301,11 +313,13 @@ def execute_defense_response(idx, resp_type):
     blocked_by_greatwall = False
     if resp_type == '长城' and "长城" in p['hand']:
         p['hand'].remove("长城")
-        add_log(f"🧱 机器人【{p['name']}】祭出高耸【长城】！完美格挡了本次针对其发动的【{card_name}】效果！")
+        game.discard_pile.append("长城")
+        add_log(f"🧱 机器人【{p['name']}】祭出高耸【长城壁】！完美格挡了本次针对其发动的【{card_name}】效果！")
         blocked_by_greatwall = True
         game.pending_action = None
     elif resp_type == '防' and "防" in p['hand'] and card_name in ["攻", "荆轲刺秦"]:
         p['hand'].remove("防")
+        game.discard_pile.append("防")
         game.pending_action['required_defenses'] -= 1
         add_log(f"🛡️ 机器人【{p['name']}】打出【防】格挡（还需 {game.pending_action['required_defenses']} 张防）")
         if game.pending_action['required_defenses'] <= 0:
@@ -313,6 +327,7 @@ def execute_defense_response(idx, resp_type):
             game.pending_action = None
     elif resp_type == '攻_as_防' and p['status'] == "暗度陈仓" and "攻" in p['hand'] and card_name in ["攻", "荆轲刺秦"]:
         p['hand'].remove("攻")
+        game.discard_pile.append("攻")
         game.pending_action['required_defenses'] -= 1
         add_log(f"🎭 机器人【{p['name']}】暗度陈仓以【攻】代【防】！（还需 {game.pending_action['required_defenses']} 张防）")
         if game.pending_action['required_defenses'] <= 0:
@@ -351,10 +366,11 @@ def execute_play_card(src_idx, card_to_spend, card_to_execute, tgt_idx):
     if card_to_spend not in src['hand']: return False
     game.actions_left -= 1
     src['hand'].remove(card_to_spend)
+    game.discard_pile.append(card_to_spend)
     if src['status'] == "卧薪尝胆" and card_to_execute != "回血":
         if src['hp'] > 1:
             src['hp'] -= 1
-            add_log(f"🔥 【{src['name']}】卧薪尝胆反噬，自损1血！(剩余:{src['hp']}/{src['max_hp']})")
+            add_log(f"🔥 【{src['name']}】卧薪尝胆反噬，执念自损1血！(剩余:{src['hp']}/{src['max_hp']})")
         else:
             add_log(f"🔥 【{src['name']}】卧薪尝胆反噬，但血量已为保底1血，不触发致死。")
     if card_to_execute in ["回血", "卡牌大师"]:
@@ -472,7 +488,7 @@ def damage_player(idx, amount, reason=""):
         p['faction_revealed'] = True
         for all_p in game.players:
             all_p['faction_revealed'] = True
-        add_log(f"🔥✨ 守护神【丁】血限归零！原地复活！生命值回满并补充 3 张牌，全场身份自此大白于天下！")
+        add_log(f"🔥✨ 守护神【丁】血限归零！原地浴火复活！生命值回满并补充 3 张牌，全场身份自此大白于天下！")
         draw_cards(idx, 3)
         for other_p in game.players:
             if other_p['alive'] and other_p['faction'] == "司":
@@ -482,7 +498,7 @@ def damage_player(idx, amount, reason=""):
         p['hp'] = 0
         p['alive'] = False
         p['faction_revealed'] = True
-        add_log(f"💀🪦 【{p['name']}】力战阵亡！其身份最终揭开：【{p['faction']}】")
+        add_log(f"💀🪦 【{p['name']}】力战阵亡！其隐藏身份最终揭开：【{p['faction']}】")
         p['hand'] = []
         p['status_cards'] = []
         p['status'] = "正常"
@@ -496,7 +512,7 @@ def check_victory_conditions():
         add_log("🏆👑 【司】胜利！主星【冀】已遭到灭杀！")
         socketio.emit('game_over', {
             "winner": "司 (叛逆者)",
-            "msg": "【司】成功击杀主星【冀】，击溃了【冀+丁】联盟，获得独立决战的最终胜利！"
+            "msg": "【司】成功击杀主星【冀】，击溃了丁卫盟，获得独立决战的最终胜利！"
         })
         return
     if not si_alive:
@@ -504,7 +520,7 @@ def check_victory_conditions():
         add_log("🏆🌟 【冀+丁】盟友阵营大捷！叛逆者【司】已经被全部清除！")
         socketio.emit('game_over', {
             "winner": "冀 + 丁 (守护联盟)",
-            "msg": "主星【冀】与护卫【丁】成功将【司】绳之以法，完美守护了和平！"
+            "msg": "主星【冀】与护卫【丁】成功将【司】绳之以法，完美守护了星域和平！"
         })
         return
 
@@ -533,7 +549,7 @@ def on_join_game(data):
             broadcast_state()
             return
         else:
-            emit('action_error', {'msg': '🚨 对战正在热血搏弈中！且大厅没有你的名字，无法中途加入。'})
+            emit('action_error', {'msg': '🚨 对战正在热血搏弈中！且大厅没有你的原战魂名，无法中途加入。'})
             return
     game.players = [p for p in game.players if not p.get('is_bot', False)]
     existing_lobby = next((p for p in game.players if p['name'] == name), None)
@@ -654,11 +670,13 @@ def on_respond_action(data):
     blocked_by_greatwall = False
     if resp_type == '长城' and "长城" in p['hand']:
         p['hand'].remove("长城")
+        game.discard_pile.append("长城")
         add_log(f"🧱 【{p['name']}】祭出高耸【长城壁】！完美格挡了本次针对其发动的【{card_name}】效果！")
         blocked_by_greatwall = True
         game.pending_action = None
     elif resp_type == '防' and "防" in p['hand'] and card_name in ["攻", "荆轲刺秦"]:
         p['hand'].remove("防")
+        game.discard_pile.append("防")
         game.pending_action['required_defenses'] -= 1
         add_log(f"🛡️ 【{p['name']}】打出【防】格挡（还需 {game.pending_action['required_defenses']} 张防）")
         if game.pending_action['required_defenses'] <= 0:
@@ -666,6 +684,7 @@ def on_respond_action(data):
             game.pending_action = None
     elif resp_type == '攻_as_防' and p['status'] == "暗度陈仓" and "攻" in p['hand'] and card_name in ["攻", "荆轲刺秦"]:
         p['hand'].remove("攻")
+        game.discard_pile.append("攻")
         game.pending_action['required_defenses'] -= 1
         add_log(f"🎭 【{p['name']}】暗度陈仓以【攻】代【防】！（还需 {game.pending_action['required_defenses']} 张防）")
         if game.pending_action['required_defenses'] <= 0:
