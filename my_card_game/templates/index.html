@@ -105,7 +105,7 @@
         .battle-area {
             width: 100%;
             height: 100%;
-            padding: 20px 320px 42vh 20px;
+            padding: 20px 320px 45vh 20px;
             overflow-y: auto;
         }
 
@@ -426,112 +426,97 @@
             box-shadow: 0 4px 15px rgba(255, 107, 107, 0.5);
         }
 
-        /* 底部操作区 - 占35%视口高度 */
+        /* 底部操作区 */
         .bottom-panel {
             position: fixed;
             bottom: 0;
             left: 0;
             right: 0;
-            min-height: 35vh;
+            min-height: 45vh;
             background: rgba(0, 0, 0, 0.75);
             border-top: 2px solid #ffb423;
-            padding: 12px 25px 18px 25px;
+            padding: 20px 30px 25px 30px;
             box-shadow: 0 -4px 30px rgba(255, 180, 35, 0.2);
             z-index: 150;
             display: flex;
             flex-direction: column;
         }
-        .end-turn-row {
-            display: flex;
-            justify-content: flex-end;
-            margin-bottom: 10px;
-            flex-shrink: 0;
-        }
-        .end-turn-btn {
-            padding: 12px 26px;
-            background: linear-gradient(135deg, #ffb423, #ff8800);
-            border: none;
-            border-radius: 8px;
-            color: #000;
-            font-size: 15px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: 0.2s;
-            box-shadow: 0 4px 15px rgba(255, 180, 35, 0.5);
-        }
-        .end-turn-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(255, 180, 35, 0.7);
-        }
-        .end-turn-btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            transform: none;
-        }
         .hand-row {
             flex: 1;
             display: flex;
             align-items: flex-start;
-            gap: 20px;
+            gap: 40px;
             min-height: 0;
         }
+
+        /* 状态装备区 - 最左边 */
         .status-section {
-            width: 840px;
             flex-shrink: 0;
         }
         .status-section h4 {
             color: #ffb423;
-            margin-bottom: 8px;
-            font-size: 13px;
+            margin-bottom: 12px;
+            font-size: 15px;
         }
         .status-cards {
             display: flex;
-            gap: 8px;
+            gap: 12px;
             flex-wrap: wrap;
         }
         .status-card {
-            padding: 8px 12px;
+            padding: 16px 28px;
             background: linear-gradient(135deg, #667eea, #764ba2);
-            border-radius: 7px;
+            border-radius: 10px;
             cursor: pointer;
-            font-size: 12px;
+            font-size: 22px;
             font-weight: bold;
             transition: 0.2s;
             text-align: center;
-            min-width: 80px;
+            min-width: 160px;
         }
         .status-card:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.5);
+            transform: translateY(-4px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
         }
         .status-card.on-cooldown {
             opacity: 0.5;
             cursor: not-allowed;
         }
         .status-card .cooldown-text {
-            font-size: 10px;
+            font-size: 14px;
             color: #ffb423;
-            margin-top: 2px;
+            margin-top: 6px;
         }
 
+        /* 手牌区 - 中间偏左上 */
+        .hand-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            max-width: 860px;
+        }
+        .hand-section h4 {
+            color: #00fff0;
+            margin-bottom: 12px;
+            font-size: 15px;
+            flex-shrink: 0;
+        }
         .hand-cards {
             flex: 1;
             display: flex;
             gap: 14px;
             flex-wrap: wrap;
             align-content: flex-start;
-        }
-        #basic-hand-anchor {
-            height: 100%;
             overflow-y: auto;
             padding-right: 8px;
             scrollbar-width: thin;
             scrollbar-color: #00fff0 #1f4068;
         }
-        #basic-hand-anchor::-webkit-scrollbar { width: 8px; }
-        #basic-hand-anchor::-webkit-scrollbar-track { background: #1f4068; border-radius: 4px; }
-        #basic-hand-anchor::-webkit-scrollbar-thumb { background: #00fff0; border-radius: 4px; }
-        #basic-hand-anchor::-webkit-scrollbar-thumb:hover { background: #00cccc; }
+        .hand-cards::-webkit-scrollbar { width: 8px; }
+        .hand-cards::-webkit-scrollbar-track { background: #1f4068; border-radius: 4px; }
+        .hand-cards::-webkit-scrollbar-thumb { background: #00fff0; border-radius: 4px; }
+        .hand-cards::-webkit-scrollbar-thumb:hover { background: #00cccc; }
 
         .hand-card {
             min-width: 110px;
@@ -592,6 +577,33 @@
         .hand-card.disabled:hover {
             transform: none;
             box-shadow: none;
+        }
+
+        /* 结束回合按钮 - 最右边 */
+        .end-turn-section {
+            flex-shrink: 0;
+            padding-top: 35px;
+        }
+        .end-turn-btn {
+            padding: 12px 26px;
+            background: linear-gradient(135deg, #ffb423, #ff8800);
+            border: none;
+            border-radius: 8px;
+            color: #000;
+            font-size: 15px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.2s;
+            box-shadow: 0 4px 15px rgba(255, 180, 35, 0.5);
+        }
+        .end-turn-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(255, 180, 35, 0.7);
+        }
+        .end-turn-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
         }
 
         /* 胜利弹窗 */
@@ -806,17 +818,22 @@
 
     <!-- 底部操作区 -->
     <div class="bottom-panel" id="bottom-panel" style="display:none;">
-        <div class="end-turn-row">
-            <button class="end-turn-btn" id="end-turn-btn" onclick="endTurn()">结束回合 ➡️</button>
-        </div>
         <div class="hand-row">
+            <!-- 状态装备区 - 最左边 -->
             <div class="status-section">
                 <h4>🎴 状态装备</h4>
                 <div class="status-cards" id="status-cards"></div>
             </div>
-            <div style="flex:1; height:100%; display:flex; flex-direction:column; min-height:0;">
-                <h4 style="color:#00fff0; margin-bottom:8px; font-size:13px; flex-shrink:0;">🃏 手牌</h4>
+
+            <!-- 手牌区 - 中间偏左上 -->
+            <div class="hand-section">
+                <h4>🃏 手牌</h4>
                 <div class="hand-cards" id="basic-hand-anchor"></div>
+            </div>
+
+            <!-- 结束回合按钮 - 最右边 -->
+            <div class="end-turn-section">
+                <button class="end-turn-btn" id="end-turn-btn" onclick="endTurn()">结束回合 ➡️</button>
             </div>
         </div>
     </div>
@@ -1193,14 +1210,16 @@
             const title = document.getElementById('prompt-title');
             const buttons = document.getElementById('prompt-buttons');
 
-            title.textContent = `⚔️ 对方对你使用【${pendingCard}】，还需 ${requiredDefenses} 张防`;
+            const isAttackCard = ['攻', '荆轲刺秦'].includes(pendingCard);
+            if (isAttackCard) {
+                title.textContent = `⚔️ 对方对你使用【${pendingCard}】，还需 ${requiredDefenses} 张防`;
+            } else {
+                title.textContent = `⚔️ 对方对你使用【${pendingCard}】`;
+            }
             buttons.innerHTML = '';
 
             const myCards = gameState.my_cards;
             const myStatus = gameState.my_status;
-
-            // 只有攻和荆轲刺秦才能出防
-            const isAttackCard = ['攻', '荆轲刺秦'].includes(pendingCard);
 
             if (isAttackCard) {
                 // 防
