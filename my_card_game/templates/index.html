@@ -105,7 +105,7 @@
         .battle-area {
             width: 100%;
             height: 100%;
-            padding: 20px 320px 350px 20px;
+            padding: 20px 320px 42vh 20px;
             overflow-y: auto;
         }
 
@@ -426,22 +426,26 @@
             box-shadow: 0 4px 15px rgba(255, 107, 107, 0.5);
         }
 
-        /* 底部操作区 */
+        /* 底部操作区 - 占35%视口高度 */
         .bottom-panel {
             position: fixed;
             bottom: 0;
             left: 0;
             right: 0;
+            min-height: 35vh;
             background: rgba(0, 0, 0, 0.75);
             border-top: 2px solid #ffb423;
             padding: 12px 25px 18px 25px;
             box-shadow: 0 -4px 30px rgba(255, 180, 35, 0.2);
             z-index: 150;
+            display: flex;
+            flex-direction: column;
         }
         .end-turn-row {
             display: flex;
             justify-content: flex-end;
             margin-bottom: 10px;
+            flex-shrink: 0;
         }
         .end-turn-btn {
             padding: 12px 26px;
@@ -465,9 +469,11 @@
             transform: none;
         }
         .hand-row {
+            flex: 1;
             display: flex;
             align-items: flex-start;
             gap: 20px;
+            min-height: 0;
         }
         .status-section {
             width: 280px;
@@ -513,9 +519,10 @@
             display: flex;
             gap: 14px;
             flex-wrap: wrap;
+            align-content: flex-start;
         }
         #basic-hand-anchor {
-            max-height: 250px;
+            height: 100%;
             overflow-y: auto;
             padding-right: 8px;
             scrollbar-width: thin;
@@ -807,8 +814,8 @@
                 <h4>🎴 状态装备</h4>
                 <div class="status-cards" id="status-cards"></div>
             </div>
-            <div style="flex:1;">
-                <h4 style="color:#00fff0; margin-bottom:8px; font-size:13px;">🃏 手牌</h4>
+            <div style="flex:1; height:100%; display:flex; flex-direction:column; min-height:0;">
+                <h4 style="color:#00fff0; margin-bottom:8px; font-size:13px; flex-shrink:0;">🃏 手牌</h4>
                 <div class="hand-cards" id="basic-hand-anchor"></div>
             </div>
         </div>
@@ -994,7 +1001,7 @@
             // 隐藏大厅，显示游戏界面
             document.getElementById('lobby-box').style.display = 'none';
             document.getElementById('game-ui').style.display = 'block';
-            document.getElementById('bottom-panel').style.display = 'block';
+            document.getElementById('bottom-panel').style.display = 'flex';
             document.getElementById('game-meta').style.display = 'inline';
 
             // 更新顶部信息
