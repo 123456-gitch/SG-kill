@@ -449,13 +449,14 @@
             min-height: 0;
         }
 
-        /* 左边面板：状态装备 + 结束按钮 */
+        /* 左边面板：状态装备 + 结束按钮 - 宽度固定，黄线不动 */
         .left-panel {
             flex-shrink: 0;
             display: flex;
             flex-direction: column;
             gap: 25px;
             padding-right: 30px;
+            min-width: 360px;
         }
 
         /* 状态装备区 */
@@ -497,7 +498,7 @@
             margin-top: 6px;
         }
 
-        /* 结束回合按钮 - 移到左边状态装备下面 */
+        /* 结束回合按钮 - 宽度乘3，占满左边面板 */
         .end-turn-section {
             flex-shrink: 0;
         }
@@ -524,7 +525,7 @@
             transform: none;
         }
 
-        /* 黄色分隔线 */
+        /* 黄色分隔线 - 位置固定 */
         .divider-line {
             width: 2px;
             background: #ffb423;
@@ -534,13 +535,12 @@
             border-radius: 1px;
         }
 
-        /* 手牌区 - 右边独立区域，带滚动条 */
+        /* 手牌区 - 右边独立区域，占满宽度，带滚动条 */
         .hand-section {
             flex: 1;
             display: flex;
             flex-direction: column;
             min-height: 0;
-            max-width: 860px;
         }
         .hand-section h4 {
             color: #00fff0;
@@ -848,7 +848,7 @@
     <!-- 底部操作区 -->
     <div class="bottom-panel" id="bottom-panel" style="display:none;">
         <div class="hand-row">
-            <!-- 左边：状态装备 + 结束按钮 -->
+            <!-- 左边：状态装备 + 结束按钮（宽度固定，黄线不动） -->
             <div class="left-panel">
                 <div class="status-section">
                     <h4>🎴 状态装备</h4>
@@ -859,10 +859,10 @@
                 </div>
             </div>
 
-            <!-- 黄色分隔线 -->
+            <!-- 黄色分隔线（位置固定） -->
             <div class="divider-line"></div>
 
-            <!-- 右边：手牌区（独立，带滚动条） -->
+            <!-- 右边：手牌区（占满宽度，顶到最右边再换行） -->
             <div class="hand-section">
                 <h4>🃏 手牌</h4>
                 <div class="hand-cards" id="basic-hand-anchor"></div>
