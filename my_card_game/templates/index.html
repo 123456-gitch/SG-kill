@@ -498,26 +498,29 @@
             margin-top: 6px;
         }
 
-        /* 结束回合按钮 - 宽度乘3，占满左边面板 */
+        /* 结束回合按钮 - 高度乘3，利用下面的区域 */
         .end-turn-section {
-            flex-shrink: 0;
+            flex: 1;
+            display: flex;
+            align-items: flex-end;
         }
         .end-turn-btn {
-            padding: 12px 26px;
             background: linear-gradient(135deg, #ffb423, #ff8800);
             border: none;
-            border-radius: 8px;
+            border-radius: 12px;
             color: #000;
-            font-size: 15px;
+            font-size: 22px;
             font-weight: bold;
             cursor: pointer;
             transition: 0.2s;
-            box-shadow: 0 4px 15px rgba(255, 180, 35, 0.5);
+            box-shadow: 0 6px 20px rgba(255, 180, 35, 0.5);
             width: 100%;
+            min-height: 120px;
+            padding: 20px 30px;
         }
         .end-turn-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(255, 180, 35, 0.7);
+            transform: translateY(-3px);
+            box-shadow: 0 8px 30px rgba(255, 180, 35, 0.7);
         }
         .end-turn-btn:disabled {
             opacity: 0.5;
